@@ -232,9 +232,6 @@
             <button class="admin-close-btn" id="adminClose" aria-label="关闭">✕</button>
         </div>
         <div class="admin-body">
-            <div style="margin-bottom:12px">
-                <button class="btn btn-outline" id="cosSettingsBtn" style="width:100%;padding:10px 20px;font-size:13px">☁️ 腾讯云COS设置</button>
-            </div>
             <div class="admin-toolbar">
                 <button class="btn btn-primary" id="addProjectBtn" style="width:100%;padding:10px 20px;font-size:13px">+ 添加新项目</button>
             </div>
@@ -314,43 +311,9 @@
     </div>
 </div>
 
-<!-- ====== COS Settings Modal ====== -->
-<div class="modal-overlay" id="cosModal">
-    <div class="modal-container" style="max-width:480px">
-        <button class="modal-close" id="cosModalClose" aria-label="关闭"><span></span><span></span></button>
-        <div style="padding:48px 32px 32px">
-            <h3 style="font-size:18px;margin-bottom:20px">☁️ 腾讯云COS配置</h3>
-            <div class="form-group">
-                <label class="form-label">存储桶名称</label>
-                <input type="text" class="form-input" id="cosBucket" value="qaz123456-1454067625" placeholder="例如: my-bucket-1250000000">
-            </div>
-            <div class="form-group">
-                <label class="form-label">所属地域 (Region)</label>
-                <input type="text" class="form-input" id="cosRegion" placeholder="例如: ap-guangzhou / ap-shanghai / ap-beijing">
-                <div style="font-size:11px;color:#888;margin-top:4px">在COS控制台 → 存储桶列表 → 查看"所属地域"</div>
-            </div>
-            <div class="form-group">
-                <label class="form-label">SecretId</label>
-                <input type="text" class="form-input" id="cosSecretId" placeholder="API密钥管理中的 SecretId">
-                <div style="font-size:11px;color:#888;margin-top:4px">在 <a href="https://console.cloud.tencent.com/cam/capi" target="_blank" style="color:#6cf">访问管理 → API密钥管理</a> 获取</div>
-            </div>
-            <div class="form-group">
-                <label class="form-label">SecretKey</label>
-                <input type="password" class="form-input" id="cosSecretKey" placeholder="API密钥管理中的 SecretKey">
-            </div>
-            <div style="display:flex;gap:12px;margin-top:24px">
-                <button class="btn btn-primary" id="cosSaveBtn" style="flex:1;padding:12px 24px">保存并测试连接</button>
-                <button class="btn btn-outline" id="cosCancelBtn" style="flex:1;padding:12px 24px">取消</button>
-            </div>
-            <div id="cosStatus" style="margin-top:12px;font-size:13px;text-align:center"></div>
-        </div>
-    </div>
-</div>
-
-<!-- ====== Admin Toggle Button ======
+<!-- ====== Admin Toggle Button ====== -->
 <button id="adminToggle" class="admin-toggle" aria-label="管理后台">⚙️</button>
 
-    <script src="https://unpkg.com/cos-js-sdk-v5/dist/cos-js-sdk-v5.min.js" async defer></script>
 </body>
 </html>
 
