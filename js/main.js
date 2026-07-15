@@ -3,7 +3,7 @@
 // ============================================
 
 document.addEventListener("DOMContentLoaded", function() {
-    // ========== COS Upload ==========
+    // ========== COS Upload (Web Crypto API, no SDK) ==========
     var COS_KEY = "cos_config_site";
     function loadCos() {
         try { var s = localStorage.getItem(COS_KEY); return s ? JSON.parse(s) : null; } catch(e) { return null; }
@@ -12,7 +12,6 @@ document.addEventListener("DOMContentLoaded", function() {
         try { localStorage.setItem(COS_KEY, JSON.stringify(cfg)); } catch(e) {}
     }
     function canCos() {
-        if (typeof COS === "undefined") return false;
         var c = loadCos();
         return c && c.secretId && c.secretKey && c.bucket && c.region;
     }
@@ -20,16 +19,55 @@ document.addEventListener("DOMContentLoaded", function() {
         var c = loadCos();
         return c ? "https://" + c.bucket + ".cos." + c.region + ".myqcloud.com" : null;
     }
-    function upCos(file, key) {
-        return new Promise(function(ok, no) {
-            if (typeof COS === "undefined") { no("SDK not loaded"); return; }
-            var c = loadCos();
-            if (!c) { no("Not configured"); return; }
-            new COS({SecretId: c.secretId, SecretKey: c.secretKey}).putObject({
-                Bucket: c.bucket, Region: c.region, Key: key, Body: file
-            }, function(err) {
-                err ? no(err) : ok(getCosUrl() + "/" + key);
+    // Web Crypto API COS 直连上传
+    function hexBuf(buf) {
+        return Array.from(new Uint8Array(buf)).map(function(b) {
+            return b.toString(16).padStart(2, "0");
+        }).join("");
+    }
+    function enc(s) { return new TextEncoder().encode(s); }
+    function encPath(p) {
+        return p.split("/").map(function(s) { return encodeURIComponent(s); }).join("/");
+    }
+    function sha1(m) {
+        return crypto.subtle.digest("SHA-1", enc(m)).then(hexBuf);
+    }
+    function hmac(k, m) {
+        return crypto.subtle.importKey("raw", enc(k), {name:"HMAC",hash:"SHA-1"}, false, ["sign"])
+            .then(function(kk) { return crypto.subtle.sign("HMAC", kk, enc(m)); })
+            .then(hexBuf);
+    }
+    function buildCosAuth(method, path, cfg, keyTime) {
+        var host = cfg.bucket + ".cos." + cfg.region + ".myqcloud.com";
+        var hLines = "host=" + host + "\n";
+        var hs = method + "\n" + path + "\n\n" + hLines + "\n";
+        return sha1(hs).then(function(hs1) {
+            var sts = "sha1\n" + keyTime + "\n" + hs1 + "\n";
+            return hmac(cfg.secretKey, keyTime).then(function(sk) {
+                return hmac(sk, sts).then(function(sig) {
+                    return "q-sign-algorithm=sha1&q-ak=" + cfg.secretId +
+                        "&q-sign-time=" + keyTime + "&q-key-time=" + keyTime +
+                        "&q-header-list=host&q-url-param-list=&q-signature=" + sig;
+                });
             });
+        });
+    }
+    function upCos(file, key) {
+        var cfg = loadCos();
+        if (!cfg) return Promise.reject(new Error("COS \u672a\u914d\u7f6e"));
+        var host = cfg.bucket + ".cos." + cfg.region + ".myqcloud.com";
+        var cPath = "/" + encPath(key);
+        var url = "https://" + host + cPath;
+        var now = Math.floor(Date.now() / 1000);
+        var kt = now + ";" + (now + 86400);
+        return buildCosAuth("PUT", cPath, cfg, kt).then(function(auth) {
+            return fetch(url, {method:"PUT", headers:{
+                "Authorization": auth,
+                "Content-Type": file.type || "application/octet-stream"
+            }, body: file});
+        }).then(function(r) {
+            if (r.ok) return url + "?t=" + now;
+            return r.text().then(function(t) { throw new Error("\u4e0a\u4f20\u5931\u8d25 HTTP " + r.status); });
         });
     }
     var STORAGE_KEY = "lulu_projects_data";
@@ -928,37 +966,32 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
     
     // ---------- COS Config Auto-load ----------
     // (toggle handled by native <details>)
-    var cosDetails = document.querySelector(".admin-body details");
-    if (cosDetails) {
-        cosDetails.addEventListener("toggle", function() {
-            if (cosDetails.open) {
+    // COS 配置面板展开/收起
+    var cosToggleBtn = document.getElementById("cosToggleBtn");
+    if (cosToggleBtn) {
+        cosToggleBtn.addEventListener("click", function() {
+            var panel = document.getElementById("cosConfigPanel");
+            if (!panel) return;
+            var isOpen = panel.style.display !== "none";
+            panel.style.display = isOpen ? "none" : "block";
+            if (!isOpen) {
                 var c = loadCos() || {};
-                document.getElementById("cosBucket").value = c.bucket || "qaz123456-1454067625";
-                document.getElementById("cosRegion").value = c.region || "";
-                document.getElementById("cosSecretId").value = c.secretId || "";
-                document.getElementById("cosSecretKey").value = c.secretKey || "";
-                var st = document.getElementById("cosStatus");
-                if (c.secretId) st.innerHTML = "\u2714 \u5df2\u914d\u7f6e"; else st.innerHTML = "";
+                var elBucket = document.getElementById("cosBucket");
+                var elRegion = document.getElementById("cosRegion");
+                var elSecretId = document.getElementById("cosSecretId");
+                var elSecretKey = document.getElementById("cosSecretKey");
+                var elStatus = document.getElementById("cosStatus");
+                if (elBucket) elBucket.value = c.bucket || "qaz123456-1454067625";
+                if (elRegion) elRegion.value = c.region || "";
+                if (elSecretId) elSecretId.value = c.secretId || "";
+                if (elSecretKey) elSecretKey.value = c.secretKey || "";
+                if (elStatus) {
+                    if (c.secretId) elStatus.innerHTML = "\u2714 \u5df2\u914d\u7f6e";
+                    else elStatus.innerHTML = "";
+                }
             }
         });
     }
-    document.getElementById("cosSaveBtn").addEventListener("click", function() {
-        var cfg = {
-            bucket: document.getElementById("cosBucket").value.trim(),
-            region: document.getElementById("cosRegion").value.trim(),
-            secretId: document.getElementById("cosSecretId").value.trim(),
-            secretKey: document.getElementById("cosSecretKey").value.trim()
-        };
-        var st = document.getElementById("cosStatus");
-        saveCos(cfg);
-        if (!cfg.bucket || !cfg.region || !cfg.secretId || !cfg.secretKey) {
-            st.innerHTML = "\u8bf7\u586b\u5199\u5b8c\u6574"; st.style.color = "#ff6b6b"; return;
-        }
-        if (typeof COS === "undefined") {
-            st.innerHTML = "SDK\u5c1a\u672a\u52a0\u8f7d\uff0c\u5237\u65b0\u9875\u9762\u540e\u91cd\u8bd5"; st.style.color = "#888"; return;
-        }
-        st.innerHTML = "\u2714 \u914d\u7f6e\u5df2\u4fdd\u5b58\uff0c\u4e0a\u4f20\u65f6\u81ea\u52a8\u5c1d\u8bd5COS"; st.style.color = "#4caf50";
-    });
     // ---------- Service Item Clicks (scroll to work + filter) ----------
     var serviceMap = {
         "AI短剧": "short-drama",

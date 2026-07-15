@@ -239,31 +239,29 @@
             </div>
         </div>
         <div style="border-top:1px solid rgba(255,255,255,0.08);padding:16px 24px 20px">
-            <details style="margin-top:4px">
-            <summary style="cursor:pointer;font-size:13px;font-weight:500;padding:4px 0">
-                <span style="font-size:14px">☁️</span> 腾讯云COS配置
-            </summary>
-            <div style="margin-top:12px">
-                <div class="form-group" style="margin-bottom:8px">
-                    <label class="form-label" style="font-size:11px">存储桶</label>
-                    <input type="text" class="form-input" id="cosBucket" value="qaz123456-1454067625" style="padding:8px 12px;font-size:12px">
-                </div>
-                <div class="form-group" style="margin-bottom:8px">
-                    <label class="form-label" style="font-size:11px">地域 (Region)</label>
-                    <input type="text" class="form-input" id="cosRegion" placeholder="例: ap-guangzhou" style="padding:8px 12px;font-size:12px">
-                </div>
-                <div class="form-group" style="margin-bottom:8px">
-                    <label class="form-label" style="font-size:11px">SecretId</label>
-                    <input type="text" class="form-input" id="cosSecretId" style="padding:8px 12px;font-size:12px">
-                </div>
-                <div class="form-group" style="margin-bottom:10px">
-                    <label class="form-label" style="font-size:11px">SecretKey</label>
-                    <input type="password" class="form-input" id="cosSecretKey" style="padding:8px 12px;font-size:12px">
-                </div>
-                <button class="btn btn-primary" id="cosSaveBtn" style="width:100%;padding:8px;font-size:12px">保存配置 并测试</button>
-                <div id="cosStatus" style="font-size:11px;margin-top:6px;text-align:center;min-height:18px"></div>
-            </div>
-            </details>
+            <button id="cosToggleBtn" style="width:100%;padding:10px;font-size:13px;background:rgba(79,195,247,0.1);border:1px solid rgba(79,195,247,0.2);border-radius:8px;color:#4fc3f7;cursor:pointer;text-align:left;font-family:inherit;">
+    <span style="font-size:16px">☁️</span> 腾讯云COS配置 <span style="float:right;font-size:12px">展开 ▼</span>
+</button>
+<div id="cosConfigPanel" style="display:none;margin-top:12px">
+    <div class="form-group" style="margin-bottom:8px">
+        <label class="form-label" style="font-size:11px">存储桶</label>
+        <input type="text" class="form-input" id="cosBucket" value="qaz123456-1454067625" style="padding:8px 12px;font-size:12px">
+    </div>
+    <div class="form-group" style="margin-bottom:8px">
+        <label class="form-label" style="font-size:11px">地域 (Region)</label>
+        <input type="text" class="form-input" id="cosRegion" placeholder="例: ap-guangzhou" style="padding:8px 12px;font-size:12px">
+    </div>
+    <div class="form-group" style="margin-bottom:8px">
+        <label class="form-label" style="font-size:11px">SecretId</label>
+        <input type="text" class="form-input" id="cosSecretId" style="padding:8px 12px;font-size:12px">
+    </div>
+    <div class="form-group" style="margin-bottom:10px">
+        <label class="form-label" style="font-size:11px">SecretKey</label>
+        <input type="password" class="form-input" id="cosSecretKey" style="padding:8px 12px;font-size:12px">
+    </div>
+    <button class="btn btn-primary" id="cosSaveBtn" style="width:100%;padding:8px;font-size:12px">保存配置</button>
+    <div id="cosStatus" style="font-size:11px;margin-top:6px;text-align:center;min-height:18px"></div>
+</div>
         </div>
     </div>
 </div>
@@ -341,7 +339,7 @@
 <!-- ====== Admin Toggle Button ====== -->
 <button id="adminToggle" class="admin-toggle" aria-label="管理后台">⚙️</button>
 
-    <script src="https://unpkg.com/cos-js-sdk-v5/dist/cos-js-sdk-v5.min.js" async></script>
+    
 </body>
 </html>
 
