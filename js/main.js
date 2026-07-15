@@ -1119,7 +1119,11 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
     }
     
     var siteSetBtn = document.getElementById("siteSettingsBtn");
-    if (siteSetBtn) siteSetBtn.addEventListener("click", openSiteSettings);
+    if (siteSetBtn) siteSetBtn.addEventListener("click", function(e) { e.stopPropagation();
+        var adminPanel = document.getElementById("adminPanel");
+        if (adminPanel) adminPanel.classList.remove("open");
+        openSiteSettings();
+    });
     
     document.getElementById("siteSettingsSave").addEventListener("click", function() {
         var cfg = {
@@ -1146,7 +1150,9 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
     if (ssm) ssm.addEventListener("click", function(e) { if (e.target === ssm) ssm.classList.remove("open"); });
     // ---------- COS Settings UI ----------
     var cosBtn = document.getElementById("cosBtn");
-    if (cosBtn) cosBtn.addEventListener("click", function() {
+    if (cosBtn) cosBtn.addEventListener("click", function(e) { e.stopPropagation();
+        var adminPanel = document.getElementById("adminPanel");
+        if (adminPanel) adminPanel.classList.remove("open");
         var cfg = loadCosCfg() || {};
         document.getElementById("cosBucket").value = cfg.bucket || "qaz123456-1454067625";
         document.getElementById("cosRegion").value = cfg.region || "";
