@@ -239,12 +239,11 @@
             </div>
         </div>
         <div style="border-top:1px solid rgba(255,255,255,0.08);padding:16px 24px 20px">
-            <div style="display:flex;align-items:center;gap:8px;cursor:pointer" id="cosToggleBtn">
-                <span style="font-size:14px">☁️</span>
-                <span style="font-size:13px;font-weight:500">腾讯云COS配置</span>
-                <span style="font-size:10px;color:#888;margin-left:auto" id="cosToggleArrow">▼</span>
-            </div>
-            <div id="cosConfigBody" style="display:none;margin-top:12px">
+            <details style="margin-top:4px">
+            <summary style="cursor:pointer;font-size:13px;font-weight:500;padding:4px 0">
+                <span style="font-size:14px">☁️</span> 腾讯云COS配置
+            </summary>
+            <div style="margin-top:12px">
                 <div class="form-group" style="margin-bottom:8px">
                     <label class="form-label" style="font-size:11px">存储桶</label>
                     <input type="text" class="form-input" id="cosBucket" value="qaz123456-1454067625" style="padding:8px 12px;font-size:12px">
@@ -264,6 +263,7 @@
                 <button class="btn btn-primary" id="cosSaveBtn" style="width:100%;padding:8px;font-size:12px">保存配置 并测试</button>
                 <div id="cosStatus" style="font-size:11px;margin-top:6px;text-align:center;min-height:18px"></div>
             </div>
+            </details>
         </div>
     </div>
 </div>

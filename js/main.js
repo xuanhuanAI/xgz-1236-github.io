@@ -926,16 +926,12 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
     });
 
     
-    // ---------- COS Settings UI ----------
-    var cosToggle = document.getElementById("cosToggleBtn");
-    var cosBody = document.getElementById("cosConfigBody");
-    var cosArrow = document.getElementById("cosToggleArrow");
-    if (cosToggle && cosBody) {
-        cosToggle.addEventListener("click", function() {
-            var show = cosBody.style.display !== "block";
-            cosBody.style.display = show ? "block" : "none";
-            if (cosArrow) cosArrow.textContent = show ? "\u25b2" : "\u25bc";
-            if (show) {
+    // ---------- COS Config Auto-load ----------
+    // (toggle handled by native <details>)
+    var cosDetails = document.querySelector("#cosConfigBody details, .admin-body details");
+    if (cosDetails) {
+        cosDetails.addEventListener("toggle", function() {
+            if (cosDetails.open) {
                 var c = loadCos() || {};
                 document.getElementById("cosBucket").value = c.bucket || "qaz123456-1454067625";
                 document.getElementById("cosRegion").value = c.region || "";
@@ -967,7 +963,6 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
             st.style.color = err ? "#ff6b6b" : "#4caf50";
         });
     });
-loadHeroBg();
     // ---------- Service Item Clicks (scroll to work + filter) ----------
     var serviceMap = {
         "AI短剧": "short-drama",
