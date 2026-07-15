@@ -3,6 +3,26 @@
 // ============================================
 
 document.addEventListener("DOMContentLoaded", function() {
+    // ============================================
+    // Site Image Config - 网站图片链接配置
+    // 优先级: 公开URL > IndexedDB上传 > CSS默认
+    // ============================================
+    var SITE_CFG_KEY = "site_image_config";
+    
+    function loadSiteConfig() {
+        try {
+            var saved = localStorage.getItem(SITE_CFG_KEY);
+            return saved ? JSON.parse(saved) : {};
+        } catch(e) { return {}; }
+    }
+    function saveSiteConfig(cfg) {
+        try { localStorage.setItem(SITE_CFG_KEY, JSON.stringify(cfg)); } catch(e) {}
+    }
+    
+    function getSiteImageUrl(key) {
+        var cfg = loadSiteConfig();
+        return cfg[key] || null;
+    }
     var STORAGE_KEY = "lulu_projects_data";
     var COVERS_KEY = "lulu_covers";
     var DB_NAME = "LuluStudioDB";
@@ -589,6 +609,15 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
     }
 
     function loadPortrait() {
+        var cfgUrl = getSiteImageUrl("portrait");
+        if (cfgUrl) {
+            var ph = document.querySelector(".about-portrait-placeholder");
+            if (ph) {
+                ph.style.cssText = "width:180px;height:180px;border-radius:50%;background:url(" + cfgUrl + ") center/cover no-repeat;overflow:hidden";
+                ph.innerHTML = "";
+            }
+            return;
+        }
         getPortrait().then(function(url) {
             if (url) {
                 var ph = document.querySelector(".about-portrait-placeholder");
@@ -675,6 +704,25 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
         });
     }
     function loadAboutBg() {
+        var cfgUrl = getSiteImageUrl("aboutBg");
+        if (cfgUrl) {
+            var sec = document.getElementById("about");
+            if (sec) {
+                sec.style.background = "url(" + cfgUrl + ") center/cover no-repeat fixed";
+                sec.style.position = "relative";
+                var existing = sec.querySelector(".about-bg-overlay");
+                if (!existing) {
+                    var ov = document.createElement("div");
+                    ov.className = "about-bg-overlay";
+                    ov.style.cssText = "position:absolute;inset:0;background:rgba(0,0,0,0.6);z-index:0";
+                    sec.insertBefore(ov, sec.firstChild);
+                }
+                var container = sec.querySelector(".section-container");
+                if (container) container.style.position = "relative";
+                if (container) container.style.zIndex = "1";
+            }
+            return;
+        }
         getAboutBg().then(function(url) {
             var sec = document.getElementById("about");
             if (sec) {
@@ -688,7 +736,6 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
                         ov.style.cssText = "position:absolute;inset:0;background:rgba(0,0,0,0.6);z-index:0";
                         sec.insertBefore(ov, sec.firstChild);
                     }
-                    // Make sure content is above overlay
                     var container = sec.querySelector(".section-container");
                     if (container) container.style.position = "relative";
                     if (container) container.style.zIndex = "1";
@@ -771,6 +818,24 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
         });
     }
     function loadHeroBg() {
+        var cfgUrl = getSiteImageUrl("heroBg");
+        if (cfgUrl) {
+            var heroBg = document.querySelector(".hero-bg");
+            if (heroBg) {
+                heroBg.style.background = "url(" + cfgUrl + ") center/cover no-repeat";
+                heroBg.style.position = "absolute";
+                heroBg.style.inset = "0";
+                heroBg.style.zIndex = "0";
+                var existing = heroBg.parentNode.querySelector(".hero-bg-overlay");
+                if (!existing) {
+                    var ov = document.createElement("div");
+                    ov.className = "hero-bg-overlay";
+                    ov.style.cssText = "position:absolute;inset:0;background:rgba(0,0,0,0.5);z-index:1";
+                    heroBg.parentNode.insertBefore(ov, heroBg.nextSibling);
+                }
+            }
+            return;
+        }
         getHeroBg().then(function(url) {
             var heroBg = document.querySelector(".hero-bg");
             if (heroBg) {
@@ -779,7 +844,6 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
                     heroBg.style.position = "absolute";
                     heroBg.style.inset = "0";
                     heroBg.style.zIndex = "0";
-                    // Clear the pseudo-element light effects by adding dark overlay
                     var existing = heroBg.parentNode.querySelector(".hero-bg-overlay");
                     if (!existing) {
                         var ov = document.createElement("div");
@@ -860,7 +924,43 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
                     if (target) target.click();
                 }, 400);
             });
-        })(serviceItems[i]);
+        
+    // ---------- Site Settings UI ----------
+    function openSiteSettings() {
+        var cfg = loadSiteConfig();
+        document.getElementById("cfgHeroBg").value = cfg.heroBg || "";
+        document.getElementById("cfgPortrait").value = cfg.portrait || "";
+        document.getElementById("cfgAboutBg").value = cfg.aboutBg || "";
+        document.getElementById("siteSettingsStatus").innerHTML = "";
+        document.getElementById("siteSettingsModal").classList.add("open");
+    }
+    
+    var siteSetBtn = document.getElementById("siteSettingsBtn");
+    if (siteSetBtn) siteSetBtn.addEventListener("click", openSiteSettings);
+    
+    document.getElementById("siteSettingsSave").addEventListener("click", function() {
+        var cfg = {
+            heroBg: document.getElementById("cfgHeroBg").value.trim(),
+            portrait: document.getElementById("cfgPortrait").value.trim(),
+            aboutBg: document.getElementById("cfgAboutBg").value.trim()
+        };
+        saveSiteConfig(cfg);
+        loadHeroBg();
+        loadPortrait();
+        loadAboutBg();
+        document.getElementById("siteSettingsStatus").innerHTML = "\u2714 \u4fdd\u5b58\u6210\u529f\uff01";
+        document.getElementById("siteSettingsStatus").style.color = "#4caf50";
+        setTimeout(function() { document.getElementById("siteSettingsModal").classList.remove("open"); }, 1000);
+    });
+    
+    document.getElementById("siteSettingsCancel").addEventListener("click", function() {
+        document.getElementById("siteSettingsModal").classList.remove("open");
+    });
+    document.getElementById("siteSettingsClose").addEventListener("click", function() {
+        document.getElementById("siteSettingsModal").classList.remove("open");
+    });
+    var ssm = document.getElementById("siteSettingsModal");
+    if (ssm) ssm.addEventListener("click", function(e) { if (e.target === ssm) ssm.classList.remove("open"); });})(serviceItems[i]);
     }
 });
 
