@@ -29,124 +29,78 @@ document.addEventListener("DOMContentLoaded", function() {
     function encPath(p) {
         return p.split("/").map(function(s) { return encodeURIComponent(s); }).join("/");
     }
-    // ====== 纯 JS HMAC-SHA1 实现 ======
-    // (btoa + sha1 + hmac - 不依赖 crypto.subtle，兼容性更好)
-    function sha1(msg) { return jsSHA1(msg); }
-    function hmac(key, msg) {
-        var blockSize = 64; // SHA-1 block size
-        var keyBytes = strToBytes(key);
-        if (keyBytes.length > blockSize) keyBytes = sha1Bytes(keyBytes);
-        if (keyBytes.length < blockSize) {
-            var padded = new Uint8Array(blockSize);
-            padded.set(keyBytes);
-            keyBytes = padded;
-        }
-        var oKeyPad = new Uint8Array(blockSize);
-        var iKeyPad = new Uint8Array(blockSize);
-        for (var i = 0; i < blockSize; i++) {
-            oKeyPad[i] = keyBytes[i] ^ 0x5c;
-            iKeyPad[i] = keyBytes[i] ^ 0x36;
-        }
-        var innerBytes = new Uint8Array(iKeyPad.length + strToBytes(msg).length);
-        innerBytes.set(iKeyPad);
-        innerBytes.set(strToBytes(msg), iKeyPad.length);
-        var innerHash = sha1Bytes(innerBytes);
-        var outerBytes = new Uint8Array(oKeyPad.length + innerHash.length);
-        outerBytes.set(oKeyPad);
-        outerBytes.set(innerHash, oKeyPad.length);
-        return bytesToHex(sha1Bytes(outerBytes));
-    }
-    function hmacRaw(keyBytes, msg) {
-        // keyBytes is already raw bytes (Uint8Array)
-        var blockSize = 64;
-        if (keyBytes.length > blockSize) keyBytes = sha1Bytes(keyBytes);
-        if (keyBytes.length < blockSize) {
-            var padded = new Uint8Array(blockSize);
-            padded.set(keyBytes);
-            keyBytes = padded;
-        }
-        var oKeyPad = new Uint8Array(blockSize);
-        var iKeyPad = new Uint8Array(blockSize);
-        for (var i = 0; i < blockSize; i++) {
-            oKeyPad[i] = keyBytes[i] ^ 0x5c;
-            iKeyPad[i] = keyBytes[i] ^ 0x36;
-        }
-        var innerBytes = new Uint8Array(iKeyPad.length + strToBytes(msg).length);
-        innerBytes.set(iKeyPad);
-        innerBytes.set(strToBytes(msg), iKeyPad.length);
-        var innerHash = sha1Bytes(innerBytes);
-        var outerBytes = new Uint8Array(oKeyPad.length + innerHash.length);
-        outerBytes.set(oKeyPad);
-        outerBytes.set(innerHash, oKeyPad.length);
-        return bytesToHex(sha1Bytes(outerBytes));
-    }
-    function hexToBytes(hex) {
-        var len = hex.length;
-        var bytes = new Uint8Array(len / 2);
-        for (var i = 0; i < len; i += 2) {
-            bytes[i/2] = parseInt(hex.substr(i, 2), 16);
-        }
-        return bytes;
-    }
-    function strToBytes(s) {
-        return new TextEncoder().encode(s);
-    }
-    function bytesToHex(b) {
-        return Array.from(b).map(function(x) { return (x >> 4).toString(16) + (x & 15).toString(16); }).join("");
-    }
-    // SHA-1 纯实现
-    function jsSHA1(msg) {
-        return bytesToHex(sha1Bytes(strToBytes(msg)));
-    }
-    function sha1Bytes(bytes) {
-        // SHA-1 implementation
-        var H0 = 0x67452301, H1 = 0xEFCDAB89, H2 = 0x98BADCFE, H3 = 0x10325476, H4 = 0xC3D2E1F0;
+    // ====== SHA-1 (works on Uint8Array, no string conversion) ======
+    function sha1Raw(bytes) {
         var ml = bytes.length * 8;
-        // Pad the message
-        var padded = new Uint8Array((bytes.length + 9 + 63) & ~63);
-        padded.set(bytes);
-        padded[bytes.length] = 0x80;
-        var dv = new DataView(padded.buffer);
-        dv.setUint32(padded.length - 4, ml >>> 32, false);
-        dv.setUint32(padded.length - 8, ml & 0xFFFFFFFF, false);
-        // Process blocks
-        for (var block = 0; block < padded.length; block += 64) {
+        var padZ = (56 - (bytes.length + 1) % 64 + 64) % 64;
+        var p = new Uint8Array(bytes.length + 1 + padZ + 8);
+        p.set(bytes); p[bytes.length] = 0x80;
+        var dv = new DataView(p.buffer);
+        dv.setUint32(p.length - 8, ml / 0x100000000 | 0, false);
+        dv.setUint32(p.length - 4, ml | 0, false);
+        var H = [0x67452301, 0xEFCDAB89, 0x98BADCFE, 0x10325476, 0xC3D2E1F0];
+        for (var blk = 0; blk < p.length; blk += 64) {
             var w = new Array(80);
-            for (var t = 0; t < 16; t++) w[t] = dv.getUint32(block + t * 4, false);
-            for (t = 16; t < 80; t++) {
-                w[t] = (w[t-3] ^ w[t-8] ^ w[t-14] ^ w[t-16]) << 1 | (w[t-3] ^ w[t-8] ^ w[t-14] ^ w[t-16]) >>> 31;
-            }
-            var a = H0, b = H1, c = H2, d = H3, e = H4;
+            for (var t = 0; t < 16; t++) w[t] = dv.getUint32(blk + t * 4, false);
+            for (t = 16; t < 80; t++) { var x = w[t-3] ^ w[t-8] ^ w[t-14] ^ w[t-16]; w[t] = (x << 1) | (x >>> 31); }
+            var a = H[0], b2 = H[1], c2 = H[2], d2 = H[3], e2 = H[4];
             for (t = 0; t < 80; t++) {
                 var f, k;
-                if (t < 20) { f = (b & c) | (~b & d); k = 0x5A827999; }
-                else if (t < 40) { f = b ^ c ^ d; k = 0x6ED9EBA1; }
-                else if (t < 60) { f = (b & c) | (b & d) | (c & d); k = 0x8F1BBCDC; }
-                else { f = b ^ c ^ d; k = 0xCA62C1D6; }
-                var temp = ((a << 5) | (a >>> 27)) + f + e + k + w[t];
-                e = d; d = c; c = (b << 30) | (b >>> 2); b = a; a = temp;
+                if (t < 20) { f = (b2 & c2) | (~b2 & d2); k = 0x5A827999; }
+                else if (t < 40) { f = b2 ^ c2 ^ d2; k = 0x6ED9EBA1; }
+                else if (t < 60) { f = (b2 & c2) | (b2 & d2) | (c2 & d2); k = 0x8F1BBCDC; }
+                else { f = b2 ^ c2 ^ d2; k = 0xCA62C1D6; }
+                var temp = ((a << 5) | (a >>> 27)) + f + e2 + k + w[t] | 0;
+                e2 = d2; d2 = c2; c2 = (b2 << 30) | (b2 >>> 2); b2 = a; a = temp;
             }
-            H0 = (H0 + a) | 0; H1 = (H1 + b) | 0; H2 = (H2 + c) | 0; H3 = (H3 + d) | 0; H4 = (H4 + e) | 0;
+            H[0] = (H[0] + a) | 0; H[1] = (H[1] + b2) | 0; H[2] = (H[2] + c2) | 0; H[3] = (H[3] + d2) | 0; H[4] = (H[4] + e2) | 0;
         }
-        var result = new Uint8Array(20);
-        var rv = new DataView(result.buffer);
-        rv.setUint32(0, H0, false); rv.setUint32(4, H1, false);
-        rv.setUint32(8, H2, false); rv.setUint32(12, H3, false); rv.setUint32(16, H4, false);
-        return result;
+        var r = new DataView(new Uint8Array(20).buffer);
+        r.setUint32(0, H[0], false); r.setUint32(4, H[1], false); r.setUint32(8, H[2], false);
+        r.setUint32(12, H[3], false); r.setUint32(16, H[4], false);
+        return new Uint8Array(r.buffer.slice(0, 20));
     }
-    function buildCosAuth(method, path, cfg, keyTime) {
+    function concatBytes(a, b) {
+        var r = new Uint8Array(a.length + b.length);
+        r.set(a); r.set(b, a.length); return r;
+    }
+    function bytesToHexStr(b) {
+        var s = "";
+        for (var i = 0; i < b.length; i++) s += (b[i]>>4).toString(16) + (b[i]&15).toString(16);
+        return s;
+    }
+    function hexToRawBytes(h) {
+        var b = new Uint8Array(h.length / 2);
+        for (var i = 0; i < h.length; i += 2) b[i/2] = parseInt(h.substr(i, 2), 16);
+        return b;
+    }
+    function hmacBytes(keyBytes, msgBytes) {
+        var k = keyBytes;
+        if (k.length > 64) k = sha1Raw(k);
+        if (k.length < 64) { var p = new Uint8Array(64); p.set(k); k = p; }
+        var ipad = new Uint8Array(64), opad = new Uint8Array(64);
+        for (var i = 0; i < 64; i++) { ipad[i] = k[i] ^ 0x36; opad[i] = k[i] ^ 0x5c; }
+        return bytesToHexStr(sha1Raw(concatBytes(opad, sha1Raw(concatBytes(ipad, msgBytes)))));
+    }
+    function hmacStr(keyStr, msgStr) {
+        return hmacBytes(enc(keyStr), enc(msgStr));
+    }
+    function jsSHA1(s) {
+        return bytesToHexStr(sha1Raw(enc(s)));
+    }
+    function buildCosAuth(method, path, cfg, keyTime, contentType) {
         var host = cfg.bucket + ".cos." + cfg.region + ".myqcloud.com";
-        var methodLower = method.toLowerCase();
-        var headerStr = "host=" + host;
-        var hs = methodLower + "\n" + path + "\n\n" + headerStr + "\n";
+        var m = method.toLowerCase();
+        var ct = contentType || "application/octet-stream";
+        var headers = "content-type=" + encodeURIComponent(ct) + "&host=" + host;
+        var hs = m + "\n" + path + "\n\n" + headers + "\n";
         var hs1 = jsSHA1(hs);
         var sts = "sha1\n" + keyTime + "\n" + hs1 + "\n";
-        var sk = hmac(cfg.secretKey, keyTime);
-        var skBytes = hexToBytes(sk);
-        var sig = hmacRaw(skBytes, sts);
+        var sk = hmacStr(cfg.secretKey, keyTime);
+        var sig = hmacBytes(hexToRawBytes(sk), enc(sts));
         return "q-sign-algorithm=sha1&q-ak=" + cfg.secretId +
             "&q-sign-time=" + keyTime + "&q-key-time=" + keyTime +
-            "&q-header-list=host&q-url-param-list=&q-signature=" + sig;
+            "&q-header-list=content-type;host&q-url-param-list=&q-signature=" + sig;
     }
     function upCos(file, key) {
         var cfg = loadCos();
@@ -156,7 +110,7 @@ document.addEventListener("DOMContentLoaded", function() {
         var url = "https://" + host + cPath;
         var now = Math.floor(Date.now() / 1000);
         var kt = now + ";" + (now + 86400);
-        var auth = buildCosAuth("PUT", cPath, cfg, kt);
+        var auth = buildCosAuth("PUT", cPath, cfg, kt, file.type || "application/octet-stream");
             return new Promise(function(resolve, reject) {
                 var xhr = new XMLHttpRequest();
                 xhr.open("PUT", url, true);
