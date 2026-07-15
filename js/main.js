@@ -120,9 +120,19 @@ document.addEventListener("DOMContentLoaded", function() {
                     if (xhr.status >= 200 && xhr.status < 300) {
                         resolve(url + "?t=" + now);
                     } else {
-                        reject(new Error("HTTP " + xhr.status + ": " + (xhr.responseText || "unknown error").slice(0, 200)));
+                        var errText = xhr.responseText || "unknown error";
+                        // 打印 COS 返回的详细错误信息
+                        try { var parser = new DOMParser(); var xmlDoc = parser.parseFromString(errText, "text/xml"); var code = xmlDoc.getElementsByTagName("Code")[0]; var msg = xmlDoc.getElementsByTagName("Message")[0]; console.error("COS错误:", code ? code.textContent : "?", msg ? msg.textContent : "?"); } catch(e) { console.error("COS错误 (raw):", errText.slice(0, 500)); }
+                        reject(new Error("HTTP " + xhr.status + ": " + errText.slice(0, 200)));
                     }
                 };
+                xhr.onerror = function() {
+                    console.error("COS网络错误: 无法连接到服务器");
+                    reject(new Error("网络错误，请检查CORS设置"));
+                };
+                // 打印签名用于调试
+                console.log("COS Auth:", auth.slice(0, 80) + "...");
+                console.log("COS URL:", url);
                 xhr.onerror = function() {
                     reject(new Error("网络错误，请检查CORS设置"));
                 };
@@ -555,7 +565,7 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
                         if (all[j].id === id) { all[j].coverUrl = url; break; }
                     }
                     saveProjects(all);
-                }).catch(function() {
+                }).catch(function(err) { console.error("COS上传失败:", err && err.message ? err.message : err);
                     var r = new FileReader();
                     r.onload = function(ev) { saveCover(id, ev.target.result); };
                     r.readAsDataURL(cf);
@@ -581,7 +591,7 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
                         }
                     }
                     saveProjects(all);
-                }).catch(function() {
+                }).catch(function(err) { console.error("COS上传失败:", err && err.message ? err.message : err);
                     saveVideoDB(id, vf);
                 });
             } else {
@@ -613,7 +623,7 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
             var key = "site/bg_" + Date.now() + ".jpg";
             return upCos(file, key).then(function(url) {
                 try { localStorage.setItem("cos_bg_url", url); } catch(e) {}
-            }).catch(function() {
+            }).catch(function(err) { console.error("COS上传失败:", err && err.message ? err.message : err);
                 return saveBgToDB(blob);
             });
         }
@@ -705,7 +715,7 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
                 document.body.removeChild(inp);
                 loadBgImage();
                 alert("背景图已更新！");
-            }).catch(function() {
+            }).catch(function(err) { console.error("COS上传失败:", err && err.message ? err.message : err);
                 alert("上传失败，请重试");
             });
         });
@@ -734,7 +744,7 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
             var key = "site/portrait_" + Date.now() + ".jpg";
             return upCos(file, key).then(function(url) {
                 try { localStorage.setItem("cos_portrait_url", url); } catch(e) {}
-            }).catch(function() {
+            }).catch(function(err) { console.error("COS上传失败:", err && err.message ? err.message : err);
                 return saveToDB(blob, "portrait");
             });
         }
@@ -804,7 +814,7 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
                 document.body.removeChild(inp);
                 loadPortrait();
                 alert("头像已更新！");
-            }).catch(function() { alert("上传失败"); });
+            }).catch(function(err) { console.error("COS上传失败:", err && err.message ? err.message : err); alert("上传失败"); });
         });
     });
 
@@ -833,7 +843,7 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
             var key = "site/about_" + Date.now() + ".jpg";
             return upCos(file, key).then(function(url) {
                 try { localStorage.setItem("cos_about_url", url); } catch(e) {}
-            }).catch(function() {
+            }).catch(function(err) { console.error("COS上传失败:", err && err.message ? err.message : err);
                 return saveToDB(blob, "about_bg");
             });
         }
@@ -926,7 +936,7 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
                 document.body.removeChild(inp);
                 loadAboutBg();
                 alert("背景图已更新！");
-            }).catch(function() { alert("上传失败"); });
+            }).catch(function(err) { console.error("COS上传失败:", err && err.message ? err.message : err); alert("上传失败"); });
         });
     });
 
@@ -951,7 +961,7 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
             var key = "site/hero_" + Date.now() + ".jpg";
             return upCos(file, key).then(function(url) {
                 try { localStorage.setItem("cos_hero_url", url); } catch(e) {}
-            }).catch(function() {
+            }).catch(function(err) { console.error("COS上传失败:", err && err.message ? err.message : err);
                 return saveToDB(blob, "hero_bg");
             });
         }
@@ -1052,7 +1062,7 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
                 document.body.removeChild(inp);
                 loadHeroBg();
                 alert("首页背景已更新！");
-            }).catch(function() { alert("上传失败"); });
+            }).catch(function(err) { console.error("COS上传失败:", err && err.message ? err.message : err); alert("上传失败"); });
         });
     });
 
