@@ -1,0 +1,308 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>仙侠玄幻AI — AI 影视创作者</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>✨</text></svg>">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<nav class="navbar" id="navbar">
+    <div class="nav-container">
+        <a href="#home" class="nav-logo">仙侠玄幻AI</a>
+        <div class="nav-menu" id="navMenu">
+            <a href="#work" class="nav-link">作品</a>
+            <a href="#about" class="nav-link">关于</a>
+            <a href="#contact" class="nav-link">联系</a>
+        </div>
+        <button class="nav-toggle" id="navToggle" aria-label="菜单">
+            <span></span><span></span><span></span>
+        </button>
+    </div>
+</nav>
+
+<section class="hero" id="home">
+    <div class="hero-bg"></div>
+    <div class="hero-spotlight"></div>
+    <div class="hero-content">
+        <div class="hero-eyebrow">仙侠玄幻AI</div>
+        <h1 class="hero-title">AI <span class="title-accent">视觉创作者</span></h1>
+        <p class="hero-subtitle">用AI语言讲述每一个视觉故事</p>
+        <div class="hero-actions">
+            <a href="#work" class="btn btn-primary">探索作品</a>
+            <a href="#contact" class="btn btn-outline">联系我</a>
+        </div>
+    </div>
+    <div class="hero-showcase">
+        <div class="showcase-track">
+            <div class="showcase-item" data-filter="short-drama">
+                <div class="showcase-thumb" style="background:linear-gradient(135deg,#1a1a2e,#16213e)">
+                    <span class="showcase-icon">🎬</span>
+                    <span class="showcase-label">短剧</span>
+                </div>
+            </div>
+            <div class="showcase-item" data-filter="commercial">
+                <div class="showcase-thumb" style="background:linear-gradient(135deg,#2d1b1b,#3d2020)">
+                    <span class="showcase-icon">📺</span>
+                    <span class="showcase-label">广告</span>
+                </div>
+            </div>
+            <div class="showcase-item" data-filter="micro-film">
+                <div class="showcase-thumb" style="background:linear-gradient(135deg,#1b2d1b,#203d20)">
+                    <span class="showcase-icon">🎥</span>
+                    <span class="showcase-label">微电影</span>
+                </div>
+            </div>
+            <div class="showcase-item" data-filter="brand">
+                <div class="showcase-thumb" style="background:linear-gradient(135deg,#2e1b3d,#3d2040)">
+                    <span class="showcase-icon">🎨</span>
+                    <span class="showcase-label">品牌</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="scroll-indicator">
+        <span>向下滚动</span>
+        <div class="scroll-line"></div>
+    </div>
+</section>
+<div class="section-divider"></div>
+
+<section class="section work-section" id="work">
+    <div class="section-container">
+        <div class="section-header">
+            <span class="section-tag">作品集</span>
+            <h2 class="section-title">精选项目</h2>
+            <p class="section-desc">每一部作品都是AI技术与视觉艺术的融合</p>
+        </div>
+        <div class="filter-bar">
+            <button class="filter-btn active" data-filter="all">全部</button>
+            <button class="filter-btn" data-filter="short-drama">AI短剧</button>
+            <button class="filter-btn" data-filter="commercial">AI广告片</button>
+            <button class="filter-btn" data-filter="micro-film">AI微电影</button>
+            <button class="filter-btn" data-filter="comic">AI漫剧</button>
+            <button class="filter-btn" data-filter="brand">品牌视觉</button>
+        </div>
+        <div class="work-grid" id="workGrid"></div>
+    </div>
+</section>
+<div class="section-divider"></div>
+
+<section class="section about-section" id="about">
+    <div class="section-container">
+        <div class="section-header">
+            <span class="section-tag">About</span>
+            <h2 class="section-title">视觉创作者</h2>
+            <p class="section-desc">用AI重新定义影像叙事的边界</p>
+        </div>
+        <div class="about-content">
+            <div class="about-visual">
+                <div class="about-frame">
+                    <div class="about-frame-inner">
+                        <div class="about-portrait-placeholder">
+                            <span class="about-badge">AI</span>
+                        </div>
+                    </div>
+                    <div class="about-frame-caption">
+                        <span>AI Film Creator</span>
+                        <span>LULU</span>
+                    </div>
+                </div>
+            </div>
+            <div class="about-text">
+                <p class="about-bio">
+                    我是LULU，一名专注于<span class="bio-highlight">AI影像创作</span>的视觉内容创作者。
+                </p>
+                <p class="about-bio">
+                    从概念创意到成片输出，AI贯穿每一个创作环节——<br>
+                    将抽象的想象力，转化为可被观看的视觉语言。
+                </p>
+                <p class="about-bio">
+                    我擅长用AI构建从短剧、广告到品牌视觉的完整内容体系。
+                </p>
+                <div class="about-services">
+                    <div class="service-item">
+                        <span class="service-icon">🎬</span>
+                        <div class="service-text">
+                            <span class="service-name">AI短剧 · 广告片</span>
+                            <span class="service-desc">从剧本到成片的全AI工作流制作</span>
+                        </div>
+                    </div>
+                    <div class="service-item">
+                        <span class="service-icon">🎥</span>
+                        <div class="service-text">
+                            <span class="service-name">AI微电影 · 漫剧</span>
+                            <span class="service-desc">电影级叙事与视觉风格的AI实现</span>
+                        </div>
+                    </div>
+                    <div class="service-item">
+                        <span class="service-icon">🎨</span>
+                        <div class="service-text">
+                            <span class="service-name">品牌视觉 · 广告分镜</span>
+                            <span class="service-desc">品牌视觉体系与动态影像设计</span>
+                        </div>
+                    </div>
+                    <div class="service-item">
+                        <span class="service-icon">⚡</span>
+                        <div class="service-text">
+                            <span class="service-name">AI工作流搭建</span>
+                            <span class="service-desc">定制化AI创作管线，提升制作效率</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+<div class="section-divider"></div>
+
+<section class="section contact-section" id="contact">
+    <div class="section-container">
+        <div class="section-header">
+            <span class="section-tag">联系</span>
+            <h2 class="section-title">开启合作</h2>
+            <p class="section-desc">无论你是品牌方、甲方还是内容合作伙伴，期待与你交流</p>
+        </div>
+        <div class="contact-content">
+            <div class="contact-info">
+                <div class="contact-item">
+                    <div class="contact-icon">✉️</div>
+                    <div class="contact-detail">
+                        <span class="contact-label">邮箱</span>
+                        <a href="mailto:3345968050@qq.com" class="contact-link">3345968050@qq.com</a>
+                    </div>
+                </div>
+                <div class="contact-item">
+                    <div class="contact-icon">💬</div>
+                    <div class="contact-detail">
+                        <span class="contact-label">微信</span>
+                        <span class="contact-link">x17837271238</span>
+                    </div>
+                </div>
+                <div class="contact-item">
+                    <div class="contact-icon">📕</div>
+                    <div class="contact-detail">
+                        <span class="contact-label">小红书</span>
+                        <a href="#" target="_blank" class="contact-link">仙侠玄幻AI</a>
+                    </div>
+                </div>
+                <div class="contact-item">
+                    <div class="contact-icon">🎵</div>
+                    <div class="contact-detail">
+                        <span class="contact-label">抖音</span>
+                        <a href="#" target="_blank" class="contact-link">仙侠玄幻AI</a>
+                    </div>
+                </div>
+            </div>
+            <div class="contact-cta">
+                <p>有项目合作或品牌合作需求？</p>
+                <a href="mailto:3345968050@qq.com" class="btn btn-primary">发送邮件</a>
+            </div>
+        </div>
+    </div>
+</section>
+<div class="section-divider"></div>
+
+<footer class="footer">
+    <div class="footer-container">
+        <div class="footer-brand">仙侠玄幻AI</div>
+        <p class="footer-text">用AI重新定义影视创作的边界</p>
+        <p class="footer-copy">&copy; 2026 仙侠玄幻AI. All rights reserved.</p>
+    </div>
+</footer>
+
+<div class="modal-overlay" id="projectModal">
+    <div class="modal-container">
+        <button class="modal-close" id="modalClose" aria-label="关闭"><span></span><span></span></button>
+        <div class="modal-content" id="modalContent"></div>
+    </div>
+</div>
+
+<input type="file" id="videoUploadInput" accept="video/*" style="display:none">
+<script src="js/projects.js"></script>
+<script src="js/main.js"></script>
+
+<!-- ====== Admin Panel ====== -->
+<div class="admin-overlay" id="adminPanel">
+    <div class="admin-panel">
+        <div class="admin-header">
+            <h3>项目管理</h3>
+            <button class="admin-close-btn" id="adminClose" aria-label="关闭">✕</button>
+        </div>
+        <div class="admin-body">
+            <div class="admin-toolbar">
+                <button class="btn btn-primary" id="addProjectBtn" style="width:100%;padding:10px 20px;font-size:13px">+ 添加新项目</button>
+            </div>
+            <div class="admin-list" id="adminProjectList">
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ====== Project Form Modal ====== -->
+<div class="modal-overlay" id="formModal">
+    <div class="modal-container" style="max-width:560px">
+        <button class="modal-close" id="formModalClose" aria-label="关闭"><span></span><span></span></button>
+        <form id="projectForm" style="padding:48px 32px 32px">
+            <input type="hidden" id="formId">
+            
+            <div class="form-group">
+                <label class="form-label">项目名称</label>
+                <input type="text" class="form-input" id="formTitle" required placeholder="例如：破晓">
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">项目类型</label>
+                <select class="form-select" id="formType">
+                    <option value="short-drama">AI短剧</option>
+                    <option value="commercial">AI广告片</option>
+                    <option value="micro-film">AI微电影</option>
+                    <option value="comic">AI漫剧</option>
+                    <option value="brand">品牌视觉</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">一句话亮点</label>
+                <input type="text" class="form-input" id="formHighlight" placeholder="例如：全AI工作流 · 72小时从剧本到成片">
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">项目介绍</label>
+                <textarea class="form-input form-textarea" id="formSubtitle" rows="3" placeholder="项目详细介绍..."></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">核心亮点（每行一个）</label>
+                <textarea class="form-input form-textarea" id="formHighlights" rows="4" placeholder="全AI工作流制作，从剧本到成片仅用72小时&#10;独创的AI镜头调度系统，实现电影级运镜"></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">封面图片</label>
+                <input type="file" class="form-file" id="formCoverFile" accept="image/*">
+                <div id="formCoverPreview"></div>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">视频文件</label>
+                <input type="file" class="form-file" id="formVideoFile" accept="video/*">
+                <div style="font-size:11px;color:#666;margin-top:4px">支持 mp4、webm 格式</div>
+            </div>
+            
+            <div class="form-actions" style="display:flex;gap:12px;margin-top:24px">
+                <button type="submit" class="btn btn-primary" style="flex:1;padding:12px 24px">保存项目</button>
+                <button type="button" class="btn btn-outline" id="formCancel" style="flex:1;padding:12px 24px">取消</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ====== Admin Toggle Button ====== -->
+<button id="adminToggle" class="admin-toggle" aria-label="管理后台">⚙️</button>
+
+</body>
+</html>
+
+
