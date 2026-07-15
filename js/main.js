@@ -307,23 +307,47 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
             var file = e.target.files[0];
             if (!file || !currentUploadProjectId) return;
             saveVideoDB(currentUploadProjectId, file).then(function() {
-                videoUploadInput.value = "";
-                var all = loadProjects();
-                for (var i = 0; i < all.length; i++) {
-                    if (all[i].id === currentUploadProjectId) { openModal(all[i]); break; }
-                }
-            }).catch(function() { alert("上传失败，请重试"); });
-        });
-    }
-
-    // ---------- Filter ----------
-    var filterBtns = document.querySelectorAll(".filter-btn");
-    for (var i = 0; i < filterBtns.length; i++) {
-        (function(btn) {
-            btn.addEventListener("click", function() {
-                for (var j = 0; j < filterBtns.length; j++) filterBtns[j].classList.remove("active");
-                btn.classList.add("active");
-                renderProjects(btn.getAttribute("data-filter"));
+            document.getElementById("changeCoverBtn").addEventListener("click", function() {
+                var inp = document.createElement("input");
+                inp.type = "file"; inp.accept = "image/*";
+                inp.style.display = "none";
+                document.body.appendChild(inp);
+                inp.click();
+                inp.addEventListener("change", function() {
+                    if (!inp.files[0]) { document.body.removeChild(inp); return; }
+                    var cf = inp.files[0];
+                    if (canCos()) {
+                        var ext = cf.name.split(".").pop() || "jpg";
+                        var ck = "site/covers/" + project.id + "_cover_" + Date.now() + "." + ext;
+                        upCos(cf, ck).then(function(url) {
+                            project.coverUrl = url;
+                            var all = loadProjects();
+                            for (var j = 0; j < all.length; j++) {
+                                if (all[j].id === project.id) { all[j].coverUrl = url; break; }
+                            }
+                            saveProjects(all);
+                            document.body.removeChild(inp);
+                            openModal(project);
+                        }).catch(function() {
+                            var r = new FileReader();
+                            r.onload = function(ev) {
+                                saveCover(project.id, ev.target.result);
+                                document.body.removeChild(inp);
+                                openModal(project);
+                            };
+                            r.readAsDataURL(cf);
+                        });
+                    } else {
+                        var r = new FileReader();
+                        r.onload = function(ev) {
+                            saveCover(project.id, ev.target.result);
+                            document.body.removeChild(inp);
+                            openModal(project);
+                        };
+                        r.readAsDataURL(cf);
+                    }
+                });
+            });
                 initScrollReveal();
             });
         })(filterBtns[i]);
@@ -502,12 +526,48 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
         saveProjects(all);
 
         if (formCoverFile.files[0]) {
-            var r = new FileReader();
-            r.onload = function(ev) { saveCover(id, ev.target.result); };
-            r.readAsDataURL(formCoverFile.files[0]);
+            var cf = formCoverFile.files[0];
+            if (canCos()) {
+                var ext = cf.name.split(".").pop() || "jpg";
+                var ck = "site/covers/" + id + "_" + Date.now() + "." + ext;
+                upCos(cf, ck).then(function(url) {
+                    var all = loadProjects();
+                    for (var j = 0; j < all.length; j++) {
+                        if (all[j].id === id) { all[j].coverUrl = url; break; }
+                    }
+                    saveProjects(all);
+                }).catch(function() {
+                    var r = new FileReader();
+                    r.onload = function(ev) { saveCover(id, ev.target.result); };
+                    r.readAsDataURL(cf);
+                });
+            } else {
+                var r = new FileReader();
+                r.onload = function(ev) { saveCover(id, ev.target.result); };
+                r.readAsDataURL(cf);
+            }
         }
         if (formVideoFile.files[0]) {
-            saveVideoDB(id, formVideoFile.files[0]);
+            var vf = formVideoFile.files[0];
+            if (canCos()) {
+                var ext = vf.name.split(".").pop() || "mp4";
+                var vk = "site/videos/" + id + "_" + Date.now() + "." + ext;
+                upCos(vf, vk).then(function(url) {
+                    var all = loadProjects();
+                    for (var j = 0; j < all.length; j++) {
+                        if (all[j].id === id) {
+                            if (!all[j].detail) all[j].detail = {};
+                            all[j].detail.videoUrl = url;
+                            break;
+                        }
+                    }
+                    saveProjects(all);
+                }).catch(function() {
+                    saveVideoDB(id, vf);
+                });
+            } else {
+                saveVideoDB(id, vf);
+            }
         }
 
         formModal.classList.remove("open");
@@ -529,6 +589,18 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
     initScrollReveal();
     // ---------- Background Image (IndexedDB - no size limit) ----------
     function saveBgImage(blob) {
+        var file = blob;
+        if (canCos()) {
+            var key = "site/bg_" + Date.now() + ".jpg";
+            return upCos(file, key).then(function(url) {
+                try { localStorage.setItem("cos_bg_url", url); } catch(e) {}
+            }).catch(function() {
+                return saveBgToDB(blob);
+            });
+        }
+        return saveBgToDB(blob);
+    }
+    function saveBgToDB(blob) {
         return openDB().then(function(db) {
             return new Promise(function(res, rej) {
                 var t = db.transaction(VIDEO_STORE, "readwrite");
@@ -561,6 +633,21 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
         });
     }
 
+        var cosUrl = null;
+        try { cosUrl = localStorage.getItem("cos_bg_url"); } catch(e) {}
+        if (cosUrl) {
+            document.body.style.backgroundImage = "url(" + cosUrl + ")";
+            document.body.style.backgroundSize = "cover";
+            document.body.style.backgroundPosition = "center";
+            document.body.style.backgroundAttachment = "fixed";
+            if (!document.getElementById("bgOverlay")) {
+                var overlay = document.createElement("div");
+                overlay.id = "bgOverlay";
+                overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:-1;pointer-events:none";
+                document.body.appendChild(overlay);
+            }
+            return;
+        }
     function loadBgImage() {
         getBgImage().then(function(url) {
             if (url) {
