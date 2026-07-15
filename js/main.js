@@ -307,50 +307,10 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
             var file = e.target.files[0];
             if (!file || !currentUploadProjectId) return;
             saveVideoDB(currentUploadProjectId, file).then(function() {
-            document.getElementById("changeCoverBtn").addEventListener("click", function() {
-                var inp = document.createElement("input");
-                inp.type = "file"; inp.accept = "image/*";
-                inp.style.display = "none";
-                document.body.appendChild(inp);
-                inp.click();
-                inp.addEventListener("change", function() {
-                    if (!inp.files[0]) { document.body.removeChild(inp); return; }
-                    var cf = inp.files[0];
-                    if (canCos()) {
-                        var ext = cf.name.split(".").pop() || "jpg";
-                        var ck = "site/covers/" + project.id + "_cover_" + Date.now() + "." + ext;
-                        upCos(cf, ck).then(function(url) {
-                            project.coverUrl = url;
-                            var all = loadProjects();
-                            for (var j = 0; j < all.length; j++) {
-                                if (all[j].id === project.id) { all[j].coverUrl = url; break; }
-                            }
-                            saveProjects(all);
-                            document.body.removeChild(inp);
-                            openModal(project);
-                        }).catch(function() {
-                            var r = new FileReader();
-                            r.onload = function(ev) {
-                                saveCover(project.id, ev.target.result);
-                                document.body.removeChild(inp);
-                                openModal(project);
-                            };
-                            r.readAsDataURL(cf);
-                        });
-                    } else {
-                        var r = new FileReader();
-                        r.onload = function(ev) {
-                            saveCover(project.id, ev.target.result);
-                            document.body.removeChild(inp);
-                            openModal(project);
-                        };
-                        r.readAsDataURL(cf);
-                    }
-                });
+                closeModal();
+                alert("视频上传成功");
             });
-                initScrollReveal();
-            });
-        })(filterBtns[i]);
+        });
     }
 
     // ---------- Showcase ----------
