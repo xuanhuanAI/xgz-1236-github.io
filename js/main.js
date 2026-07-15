@@ -29,20 +29,56 @@ document.addEventListener("DOMContentLoaded", function() {
     function encPath(p) {
         return p.split("/").map(function(s) { return encodeURIComponent(s); }).join("/");
     }
-    function sha1(m) {
-        return crypto.subtle.digest("SHA-1", enc(m)).then(hexBuf);
+    // ====== 纯 JS HMAC-SHA1 实现 ======
+    // (btoa + sha1 + hmac - 不依赖 crypto.subtle，兼容性更好)
+    function sha1(msg) { return jsSHA1(msg); }
+    function hmac(key, msg) {
+        var blockSize = 64; // SHA-1 block size
+        var keyBytes = strToBytes(key);
+        if (keyBytes.length > blockSize) keyBytes = sha1Bytes(keyBytes);
+        if (keyBytes.length < blockSize) {
+            var padded = new Uint8Array(blockSize);
+            padded.set(keyBytes);
+            keyBytes = padded;
+        }
+        var oKeyPad = new Uint8Array(blockSize);
+        var iKeyPad = new Uint8Array(blockSize);
+        for (var i = 0; i < blockSize; i++) {
+            oKeyPad[i] = keyBytes[i] ^ 0x5c;
+            iKeyPad[i] = keyBytes[i] ^ 0x36;
+        }
+        var innerBytes = new Uint8Array(iKeyPad.length + strToBytes(msg).length);
+        innerBytes.set(iKeyPad);
+        innerBytes.set(strToBytes(msg), iKeyPad.length);
+        var innerHash = sha1Bytes(innerBytes);
+        var outerBytes = new Uint8Array(oKeyPad.length + innerHash.length);
+        outerBytes.set(oKeyPad);
+        outerBytes.set(innerHash, oKeyPad.length);
+        return bytesToHex(sha1Bytes(outerBytes));
     }
-    function hmac(k, m) {
-        // k 是字符串，直接用作 UTF-8 字节
-        return crypto.subtle.importKey("raw", enc(k), {name:"HMAC",hash:"SHA-1"}, false, ["sign"])
-            .then(function(kk) { return crypto.subtle.sign("HMAC", kk, enc(m)); })
-            .then(hexBuf);
-    }
-    function hmacRaw(k, m) {
-        // k 已经是原始字节 (Uint8Array)，直接使用
-        return crypto.subtle.importKey("raw", k, {name:"HMAC",hash:"SHA-1"}, false, ["sign"])
-            .then(function(kk) { return crypto.subtle.sign("HMAC", kk, enc(m)); })
-            .then(hexBuf);
+    function hmacRaw(keyBytes, msg) {
+        // keyBytes is already raw bytes (Uint8Array)
+        var blockSize = 64;
+        if (keyBytes.length > blockSize) keyBytes = sha1Bytes(keyBytes);
+        if (keyBytes.length < blockSize) {
+            var padded = new Uint8Array(blockSize);
+            padded.set(keyBytes);
+            keyBytes = padded;
+        }
+        var oKeyPad = new Uint8Array(blockSize);
+        var iKeyPad = new Uint8Array(blockSize);
+        for (var i = 0; i < blockSize; i++) {
+            oKeyPad[i] = keyBytes[i] ^ 0x5c;
+            iKeyPad[i] = keyBytes[i] ^ 0x36;
+        }
+        var innerBytes = new Uint8Array(iKeyPad.length + strToBytes(msg).length);
+        innerBytes.set(iKeyPad);
+        innerBytes.set(strToBytes(msg), iKeyPad.length);
+        var innerHash = sha1Bytes(innerBytes);
+        var outerBytes = new Uint8Array(oKeyPad.length + innerHash.length);
+        outerBytes.set(oKeyPad);
+        outerBytes.set(innerHash, oKeyPad.length);
+        return bytesToHex(sha1Bytes(outerBytes));
     }
     function hexToBytes(hex) {
         var len = hex.length;
@@ -52,29 +88,65 @@ document.addEventListener("DOMContentLoaded", function() {
         }
         return bytes;
     }
+    function strToBytes(s) {
+        return new TextEncoder().encode(s);
+    }
+    function bytesToHex(b) {
+        return Array.from(b).map(function(x) { return (x >> 4).toString(16) + (x & 15).toString(16); }).join("");
+    }
+    // SHA-1 纯实现
+    function jsSHA1(msg) {
+        return bytesToHex(sha1Bytes(strToBytes(msg)));
+    }
+    function sha1Bytes(bytes) {
+        // SHA-1 implementation
+        var H0 = 0x67452301, H1 = 0xEFCDAB89, H2 = 0x98BADCFE, H3 = 0x10325476, H4 = 0xC3D2E1F0;
+        var ml = bytes.length * 8;
+        // Pad the message
+        var padded = new Uint8Array((bytes.length + 9 + 63) & ~63);
+        padded.set(bytes);
+        padded[bytes.length] = 0x80;
+        var dv = new DataView(padded.buffer);
+        dv.setUint32(padded.length - 4, ml >>> 32, false);
+        dv.setUint32(padded.length - 8, ml & 0xFFFFFFFF, false);
+        // Process blocks
+        for (var block = 0; block < padded.length; block += 64) {
+            var w = new Array(80);
+            for (var t = 0; t < 16; t++) w[t] = dv.getUint32(block + t * 4, false);
+            for (t = 16; t < 80; t++) {
+                w[t] = (w[t-3] ^ w[t-8] ^ w[t-14] ^ w[t-16]) << 1 | (w[t-3] ^ w[t-8] ^ w[t-14] ^ w[t-16]) >>> 31;
+            }
+            var a = H0, b = H1, c = H2, d = H3, e = H4;
+            for (t = 0; t < 80; t++) {
+                var f, k;
+                if (t < 20) { f = (b & c) | (~b & d); k = 0x5A827999; }
+                else if (t < 40) { f = b ^ c ^ d; k = 0x6ED9EBA1; }
+                else if (t < 60) { f = (b & c) | (b & d) | (c & d); k = 0x8F1BBCDC; }
+                else { f = b ^ c ^ d; k = 0xCA62C1D6; }
+                var temp = ((a << 5) | (a >>> 27)) + f + e + k + w[t];
+                e = d; d = c; c = (b << 30) | (b >>> 2); b = a; a = temp;
+            }
+            H0 = (H0 + a) | 0; H1 = (H1 + b) | 0; H2 = (H2 + c) | 0; H3 = (H3 + d) | 0; H4 = (H4 + e) | 0;
+        }
+        var result = new Uint8Array(20);
+        var rv = new DataView(result.buffer);
+        rv.setUint32(0, H0, false); rv.setUint32(4, H1, false);
+        rv.setUint32(8, H2, false); rv.setUint32(12, H3, false); rv.setUint32(16, H4, false);
+        return result;
+    }
     function buildCosAuth(method, path, cfg, keyTime) {
         var host = cfg.bucket + ".cos." + cfg.region + ".myqcloud.com";
-        // 完全匹配官方COS SDK格式:
-        // 1. 方法名小写
-        // 2. 请求头用 & 拼接
-        // 3. 尾部只有一个 \n
         var methodLower = method.toLowerCase();
         var headerStr = "host=" + host;
         var hs = methodLower + "\n" + path + "\n\n" + headerStr + "\n";
-        return sha1(hs).then(function(hs1) {
-            var sts = "sha1\n" + keyTime + "\n" + hs1 + "\n";
-            // HMAC-SHA1(secretKey, keyTime) -> SignKey (hex)
-            return hmac(cfg.secretKey, keyTime).then(function(sk) {
-                // hex字符串转原始字节
-                var skBytes = hexToBytes(sk);
-                // HMAC-SHA1(rawBytes(SignKey), stringToSign)
-                return hmacRaw(skBytes, sts).then(function(sig) {
-                    return "q-sign-algorithm=sha1&q-ak=" + cfg.secretId +
-                        "&q-sign-time=" + keyTime + "&q-key-time=" + keyTime +
-                        "&q-header-list=host&q-url-param-list=&q-signature=" + sig;
-                });
-            });
-        });
+        var hs1 = jsSHA1(hs);
+        var sts = "sha1\n" + keyTime + "\n" + hs1 + "\n";
+        var sk = hmac(cfg.secretKey, keyTime);
+        var skBytes = hexToBytes(sk);
+        var sig = hmacRaw(skBytes, sts);
+        return "q-sign-algorithm=sha1&q-ak=" + cfg.secretId +
+            "&q-sign-time=" + keyTime + "&q-key-time=" + keyTime +
+            "&q-header-list=host&q-url-param-list=&q-signature=" + sig;
     }
     function upCos(file, key) {
         var cfg = loadCos();
@@ -84,7 +156,7 @@ document.addEventListener("DOMContentLoaded", function() {
         var url = "https://" + host + cPath;
         var now = Math.floor(Date.now() / 1000);
         var kt = now + ";" + (now + 86400);
-        return buildCosAuth("PUT", cPath, cfg, kt).then(function(auth) {
+        var auth = buildCosAuth("PUT", cPath, cfg, kt);
             return new Promise(function(resolve, reject) {
                 var xhr = new XMLHttpRequest();
                 xhr.open("PUT", url, true);
@@ -102,7 +174,6 @@ document.addEventListener("DOMContentLoaded", function() {
                 };
                 xhr.send(file);
             });
-        });
     }
     var STORAGE_KEY = "lulu_projects_data";
     var COVERS_KEY = "lulu_covers";
