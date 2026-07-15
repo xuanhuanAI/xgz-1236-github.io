@@ -1,4 +1,4 @@
-﻿// ============================================
+// ============================================
 // 仙侠玄幻AI - Main JavaScript
 // ============================================
 
@@ -33,9 +33,24 @@ document.addEventListener("DOMContentLoaded", function() {
         return crypto.subtle.digest("SHA-1", enc(m)).then(hexBuf);
     }
     function hmac(k, m) {
+        // k 是字符串，直接用作 UTF-8 字节
         return crypto.subtle.importKey("raw", enc(k), {name:"HMAC",hash:"SHA-1"}, false, ["sign"])
             .then(function(kk) { return crypto.subtle.sign("HMAC", kk, enc(m)); })
             .then(hexBuf);
+    }
+    function hmacRaw(k, m) {
+        // k 已经是原始字节 (Uint8Array)，直接使用
+        return crypto.subtle.importKey("raw", k, {name:"HMAC",hash:"SHA-1"}, false, ["sign"])
+            .then(function(kk) { return crypto.subtle.sign("HMAC", kk, enc(m)); })
+            .then(hexBuf);
+    }
+    function hexToBytes(hex) {
+        var len = hex.length;
+        var bytes = new Uint8Array(len / 2);
+        for (var i = 0; i < len; i += 2) {
+            bytes[i/2] = parseInt(hex.substr(i, 2), 16);
+        }
+        return bytes;
     }
     function buildCosAuth(method, path, cfg, keyTime) {
         var host = cfg.bucket + ".cos." + cfg.region + ".myqcloud.com";
@@ -43,8 +58,12 @@ document.addEventListener("DOMContentLoaded", function() {
         var hs = method + "\n" + path + "\n\n" + hLines + "\n";
         return sha1(hs).then(function(hs1) {
             var sts = "sha1\n" + keyTime + "\n" + hs1 + "\n";
+            // 第一步: HMAC-SHA1(secretKey, keyTime) -> SignKey (hex string)
             return hmac(cfg.secretKey, keyTime).then(function(sk) {
-                return hmac(sk, sts).then(function(sig) {
+                // 关键修复: 把 SignKey 从十六进制字符串转成原始字节
+                var skBytes = hexToBytes(sk);
+                // 第二步: HMAC-SHA1(hexToBytes(SignKey), stringToSign)
+                return hmacRaw(skBytes, sts).then(function(sig) {
                     return "q-sign-algorithm=sha1&q-ak=" + cfg.secretId +
                         "&q-sign-time=" + keyTime + "&q-key-time=" + keyTime +
                         "&q-header-list=host&q-url-param-list=&q-signature=" + sig;
