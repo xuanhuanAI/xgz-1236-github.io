@@ -1114,6 +1114,13 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
         document.getElementById("cfgHeroBg").value = cfg.heroBg || "";
         document.getElementById("cfgPortrait").value = cfg.portrait || "";
         document.getElementById("cfgAboutBg").value = cfg.aboutBg || "";
+        var cosCfg = loadCosCfg() || {};
+        document.getElementById("cosBucket").value = cosCfg.bucket || "qaz123456-1454067625";
+        document.getElementById("cosRegion").value = cosCfg.region || "";
+        document.getElementById("cosSecretId").value = cosCfg.secretId || "";
+        document.getElementById("cosSecretKey").value = cosCfg.secretKey || "";
+        document.getElementById("cosStatus").innerHTML = cosCfg.secretId ? "\u2714 COS\u5df2\u914d\u7f6e" : "";
+        document.getElementById("cosStatus").style.color = cosCfg.secretId ? "#4caf50" : "#888";
         document.getElementById("siteSettingsStatus").innerHTML = "";
         document.getElementById("siteSettingsModal").classList.add("open");
     }
@@ -1132,12 +1139,29 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
             aboutBg: document.getElementById("cfgAboutBg").value.trim()
         };
         saveSiteConfig(cfg);
+        var cosCfg = {
+            bucket: document.getElementById("cosBucket").value.trim(),
+            region: document.getElementById("cosRegion").value.trim(),
+            secretId: document.getElementById("cosSecretId").value.trim(),
+            secretKey: document.getElementById("cosSecretKey").value.trim()
+        };
+        saveCosCfg(cosCfg);
         loadHeroBg();
         loadPortrait();
         loadAboutBg();
+        var st = document.getElementById("cosStatus");
+        if (cosCfg.secretId && typeof COS !== "undefined") {
+            var cos = new COS({ SecretId: cosCfg.secretId, SecretKey: cosCfg.secretKey });
+            cos.getService(function(err) {
+                st.innerHTML = err ? "\u274c " + (err.message || "\u8fde\u63a5\u5931\u8d25") : "\u2714 COS\u8fde\u63a5\u6210\u529f";
+                st.style.color = err ? "#ff6b6b" : "#4caf50";
+            });
+        } else {
+            st.innerHTML = cosCfg.secretId ? "COS SDK\u5c1a\u672a\u52a0\u8f7d\uff0c\u8bf7\u5237\u65b0" : "";
+        }
         document.getElementById("siteSettingsStatus").innerHTML = "\u2714 \u4fdd\u5b58\u6210\u529f\uff01";
         document.getElementById("siteSettingsStatus").style.color = "#4caf50";
-        setTimeout(function() { document.getElementById("siteSettingsModal").classList.remove("open"); }, 1000);
+        setTimeout(function() { document.getElementById("siteSettingsModal").classList.remove("open"); }, 1500);
     });
     
     document.getElementById("siteSettingsCancel").addEventListener("click", function() {
@@ -1148,49 +1172,7 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
     });
     var ssm = document.getElementById("siteSettingsModal");
     if (ssm) ssm.addEventListener("click", function(e) { if (e.target === ssm) ssm.classList.remove("open"); });
-    // ---------- COS Settings UI ----------
-    var cosBtn = document.getElementById("cosBtn");
-    if (cosBtn) cosBtn.addEventListener("click", function(e) { e.stopPropagation();
-        var adminPanel = document.getElementById("adminPanel");
-        if (adminPanel) adminPanel.classList.remove("open");
-        var cfg = loadCosCfg() || {};
-        document.getElementById("cosBucket").value = cfg.bucket || "qaz123456-1454067625";
-        document.getElementById("cosRegion").value = cfg.region || "";
-        document.getElementById("cosSecretId").value = cfg.secretId || "";
-        document.getElementById("cosSecretKey").value = cfg.secretKey || "";
-        document.getElementById("cosStatus").innerHTML = "";
-        document.getElementById("cosModal").classList.add("open");
-    });
-    
-    document.getElementById("cosSaveBtn").addEventListener("click", function() {
-        var cfg = {
-            bucket: document.getElementById("cosBucket").value.trim(),
-            region: document.getElementById("cosRegion").value.trim(),
-            secretId: document.getElementById("cosSecretId").value.trim(),
-            secretKey: document.getElementById("cosSecretKey").value.trim()
-        };
-        var st = document.getElementById("cosStatus");
-        st.innerHTML = "\u6b63\u5728\u6d4b\u8bd5...";
-        st.style.color = "#888";
-        saveCosCfg(cfg);
-        if (!cfg.bucket || !cfg.region || !cfg.secretId || !cfg.secretKey) {
-            st.innerHTML = "\u8bf7\u586b\u5199\u5b8c\u6574"; st.style.color = "#ff6b6b"; return;
-        }
-        if (typeof COS === "undefined") {
-            st.innerHTML = "COS SDK\u5c1a\u672a\u52a0\u8f7d\uff0c\u8bf7\u5237\u65b0\u9875\u9762\u540e\u91cd\u8bd5"; st.style.color = "#ff6b6b"; return;
-        }
-        var cos = new COS({ SecretId: cfg.secretId, SecretKey: cfg.secretKey });
-        cos.getService(function(err) {
-            if (err) { st.innerHTML = "\u8fde\u63a5\u5931\u8d25\uff1a" + (err.message || JSON.stringify(err)); st.style.color = "#ff6b6b"; }
-            else { st.innerHTML = "\u2714 \u8fde\u63a5\u6210\u529f\uff01\u4e0a\u4f20\u5c06\u81ea\u52a8\u4f7f\u7528COS"; st.style.color = "#4caf50"; }
-        });
-    });
-    
-    var closeCos = function() { document.getElementById("cosModal").classList.remove("open"); };
-    document.getElementById("cosCancelBtn").addEventListener("click", closeCos);
-    document.getElementById("cosModalClose").addEventListener("click", closeCos);
-    var cm = document.getElementById("cosModal");
-    if (cm) cm.addEventListener("click", function(e) { if (e.target === cm) closeCos(); });})(serviceItems[i]);
+    })(serviceItems[i]);
     }
 });
 
