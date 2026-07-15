@@ -54,20 +54,30 @@ document.addEventListener("DOMContentLoaded", function() {
     }
     function upCos(file, key) {
         var cfg = loadCos();
-        if (!cfg) return Promise.reject(new Error("COS \u672a\u914d\u7f6e"));
+        if (!cfg) return Promise.reject(new Error("COS 未配置"));
         var host = cfg.bucket + ".cos." + cfg.region + ".myqcloud.com";
         var cPath = "/" + encPath(key);
         var url = "https://" + host + cPath;
         var now = Math.floor(Date.now() / 1000);
         var kt = now + ";" + (now + 86400);
         return buildCosAuth("PUT", cPath, cfg, kt).then(function(auth) {
-            return fetch(url, {method:"PUT", headers:{
-                "Authorization": auth,
-                "Content-Type": file.type || "application/octet-stream"
-            }, body: file});
-        }).then(function(r) {
-            if (r.ok) return url + "?t=" + now;
-            return r.text().then(function(t) { throw new Error("\u4e0a\u4f20\u5931\u8d25 HTTP " + r.status); });
+            return new Promise(function(resolve, reject) {
+                var xhr = new XMLHttpRequest();
+                xhr.open("PUT", url, true);
+                xhr.setRequestHeader("Authorization", auth);
+                xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
+                xhr.onload = function() {
+                    if (xhr.status >= 200 && xhr.status < 300) {
+                        resolve(url + "?t=" + now);
+                    } else {
+                        reject(new Error("HTTP " + xhr.status + ": " + (xhr.responseText || "unknown error").slice(0, 200)));
+                    }
+                };
+                xhr.onerror = function() {
+                    reject(new Error("网络错误，请检查CORS设置"));
+                };
+                xhr.send(file);
+            });
         });
     }
     var STORAGE_KEY = "lulu_projects_data";
