@@ -54,15 +54,21 @@ document.addEventListener("DOMContentLoaded", function() {
     }
     function buildCosAuth(method, path, cfg, keyTime) {
         var host = cfg.bucket + ".cos." + cfg.region + ".myqcloud.com";
-        var hLines = "host=" + host + "\n";
-        var hs = method + "\n" + path + "\n\n" + hLines + "\n";
+        // 完全匹配官方COS SDK格式:
+        // 1. 方法名小写
+        // 2. 请求头用 & 拼接（而不是 
+）
+        // 3. 尾部只有一个 \n
+        var methodLower = method.toLowerCase();
+        var headerStr = "host=" + host;
+        var hs = methodLower + "\n" + path + "\n\n" + headerStr + "\n";
         return sha1(hs).then(function(hs1) {
             var sts = "sha1\n" + keyTime + "\n" + hs1 + "\n";
-            // 第一步: HMAC-SHA1(secretKey, keyTime) -> SignKey (hex string)
+            // HMAC-SHA1(secretKey, keyTime) -> SignKey (hex)
             return hmac(cfg.secretKey, keyTime).then(function(sk) {
-                // 关键修复: 把 SignKey 从十六进制字符串转成原始字节
+                // hex字符串转原始字节
                 var skBytes = hexToBytes(sk);
-                // 第二步: HMAC-SHA1(hexToBytes(SignKey), stringToSign)
+                // HMAC-SHA1(rawBytes(SignKey), stringToSign)
                 return hmacRaw(skBytes, sts).then(function(sig) {
                     return "q-sign-algorithm=sha1&q-ak=" + cfg.secretId +
                         "&q-sign-time=" + keyTime + "&q-key-time=" + keyTime +
