@@ -22,6 +22,7 @@ document.addEventListener("DOMContentLoaded", function() {
     function getCosInstance() {
         var cfg = loadCosConfig();
         if (!cfg || !cfg.secretId || !cfg.secretKey || !cfg.bucket || !cfg.region) return null;
+        if (typeof COS === "undefined") return null;
         try {
             return new COS({
                 SecretId: cfg.secretId,
@@ -1088,6 +1089,8 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
                 }, 400);
             });
         })(serviceItems[i]);
+
+    setupCosUI();
     }
 });
 
