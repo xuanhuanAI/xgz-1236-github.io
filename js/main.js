@@ -56,8 +56,7 @@ document.addEventListener("DOMContentLoaded", function() {
         var host = cfg.bucket + ".cos." + cfg.region + ".myqcloud.com";
         // 完全匹配官方COS SDK格式:
         // 1. 方法名小写
-        // 2. 请求头用 & 拼接（而不是 
-）
+        // 2. 请求头用 & 拼接
         // 3. 尾部只有一个 \n
         var methodLower = method.toLowerCase();
         var headerStr = "host=" + host;
