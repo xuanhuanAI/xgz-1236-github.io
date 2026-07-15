@@ -4,6 +4,73 @@
 
 document.addEventListener("DOMContentLoaded", function() {
     // ============================================
+    // Tencent Cloud COS - 直接上传到云存储
+    // ============================================
+    var COS_CFG_KEY = "cos_config";
+    
+    function loadCosCfg() {
+        try { var s = localStorage.getItem(COS_CFG_KEY); return s ? JSON.parse(s) : null; } catch(e) { return null; }
+    }
+    function saveCosCfg(cfg) {
+        try { localStorage.setItem(COS_CFG_KEY, JSON.stringify(cfg)); } catch(e) {}
+    }
+    
+    function hasCos() {
+        if (typeof COS === "undefined") return false;
+        var cfg = loadCosCfg();
+        return cfg && cfg.secretId && cfg.secretKey && cfg.bucket && cfg.region;
+    }
+    
+    function getCosBase() {
+        var cfg = loadCosCfg();
+        if (!cfg) return null;
+        return "https://" + cfg.bucket + ".cos." + cfg.region + ".myqcloud.com";
+    }
+    
+    function uploadToCos(file, key) {
+        return new Promise(function(resolve, reject) {
+            if (typeof COS === "undefined") { reject(new Error("COS SDK not loaded")); return; }
+            var cfg = loadCosCfg();
+            if (!cfg) { reject(new Error("COS not configured")); return; }
+            var cos = new COS({ SecretId: cfg.secretId, SecretKey: cfg.secretKey });
+            cos.putObject({
+                Bucket: cfg.bucket,
+                Region: cfg.region,
+                Key: key,
+                Body: file
+            }, function(err, data) {
+                if (err) reject(err);
+                else resolve(getCosBase() + "/" + key);
+            });
+        });
+    }
+    
+    function cosKey(prefix, fileName) {
+        var ext = fileName.split(".").pop() || "bin";
+        var ts = Date.now();
+        var rand = Math.random().toString(36).substring(2, 8);
+        return prefix + "/" + ts + "_" + rand + "." + ext;
+    }
+
+    // Helper: upload file to COS, fallback to saveFn, then call callback
+    function uploadWithCos(file, cosPrefix, saveFn, callback) {
+        if (hasCos()) {
+            var key = cosKey(cosPrefix, file.name);
+            uploadToCos(file, key).then(function(url) {
+                if (callback) callback(url);
+            }).catch(function() {
+                // Fallback: save locally
+                saveFn(file).then(function() {
+                    if (callback) callback(null);
+                });
+            });
+        } else {
+            saveFn(file).then(function() {
+                if (callback) callback(null);
+            });
+        }
+    }
+    // ============================================
     // Site Image Config - 网站图片链接配置
     // 优先级: 公开URL > IndexedDB上传 > CSS默认
     // ============================================
@@ -259,13 +326,39 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
         videoUploadInput.addEventListener("change", function(e) {
             var file = e.target.files[0];
             if (!file || !currentUploadProjectId) return;
-            saveVideoDB(currentUploadProjectId, file).then(function() {
-                videoUploadInput.value = "";
-                var all = loadProjects();
-                for (var i = 0; i < all.length; i++) {
-                    if (all[i].id === currentUploadProjectId) { openModal(all[i]); break; }
-                }
-            }).catch(function() { alert("上传失败，请重试"); });
+            var pid = currentUploadProjectId;
+            if (hasCos()) {
+                var key = cosKey("videos", file.name);
+                uploadToCos(file, key).then(function(url) {
+                    videoUploadInput.value = "";
+                    var al = loadProjects();
+                    for (var i = 0; i < al.length; i++) {
+                        if (al[i].id === pid || al[i].id == pid) {
+                            if (!al[i].detail) al[i].detail = {};
+                            al[i].detail.videoUrl = url;
+                            saveProjects(al);
+                            openModal(al[i]);
+                            break;
+                        }
+                    }
+                }).catch(function() {
+                    saveVideoDB(pid, file).then(function() {
+                        videoUploadInput.value = "";
+                        var al = loadProjects();
+                        for (var i = 0; i < al.length; i++) {
+                            if (al[i].id === pid) { openModal(al[i]); break; }
+                        }
+                    });
+                });
+            } else {
+                saveVideoDB(pid, file).then(function() {
+                    videoUploadInput.value = "";
+                    var al = loadProjects();
+                    for (var i = 0; i < al.length; i++) {
+                        if (al[i].id === pid) { openModal(al[i]); break; }
+                    }
+                }).catch(function() { alert("上传失败，请重试"); });
+            }
         });
     }
 
@@ -455,12 +548,48 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
         saveProjects(all);
 
         if (formCoverFile.files[0]) {
-            var r = new FileReader();
-            r.onload = function(ev) { saveCover(id, ev.target.result); };
-            r.readAsDataURL(formCoverFile.files[0]);
+            if (hasCos()) {
+                var file = formCoverFile.files[0];
+                var key = cosKey("covers", file.name);
+                var thatId = id;
+                uploadToCos(file, key).then(function(url) {
+                    var al = loadProjects();
+                    for (var i = 0; i < al.length; i++) {
+                        if (al[i].id === thatId || al[i].id == thatId) { al[i].coverUrl = url; break; }
+                    }
+                    saveProjects(al);
+                }).catch(function() {
+                    var r = new FileReader();
+                    r.onload = function(ev) { saveCover(thatId, ev.target.result); };
+                    r.readAsDataURL(file);
+                });
+            } else {
+                var r = new FileReader();
+                r.onload = function(ev) { saveCover(id, ev.target.result); };
+                r.readAsDataURL(file);
+            }
         }
         if (formVideoFile.files[0]) {
-            saveVideoDB(id, formVideoFile.files[0]);
+            if (hasCos()) {
+                var file = formVideoFile.files[0];
+                var key = cosKey("videos", file.name);
+                var thatId = id;
+                uploadToCos(file, key).then(function(url) {
+                    var al = loadProjects();
+                    for (var i = 0; i < al.length; i++) {
+                        if (al[i].id === thatId || al[i].id == thatId) {
+                            if (!al[i].detail) al[i].detail = {};
+                            al[i].detail.videoUrl = url;
+                            break;
+                        }
+                    }
+                    saveProjects(al);
+                }).catch(function() {
+                    saveVideoDB(thatId, file);
+                });
+            } else {
+                saveVideoDB(id, formVideoFile.files[0]);
+            }
         }
 
         formModal.classList.remove("open");
@@ -576,6 +705,24 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
     loadBgImage();
     // ---------- Portrait Upload (About section) ----------
     function savePortrait(blob) {
+        var file = blob;
+        if (hasCos()) {
+            var key = cosKey("portrait", "avatar.jpg");
+            return uploadToCos(file, key).then(function(url) {
+                var cfg = loadSiteConfig();
+                cfg.portrait = url;
+                saveSiteConfig(cfg);
+            }).catch(function() {
+                return openDB().then(function(db) {
+                    return new Promise(function(res, rej) {
+                        var t = db.transaction(VIDEO_STORE, "readwrite");
+                        t.objectStore(VIDEO_STORE).put(blob, "portrait");
+                        t.oncomplete = function() { res(); };
+                        t.onerror = function(e) { rej(e); };
+                    });
+                });
+            });
+        }
         return openDB().then(function(db) {
             return new Promise(function(res, rej) {
                 var t = db.transaction(VIDEO_STORE, "readwrite");
@@ -672,6 +819,24 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
     loadPortrait();
     // ---------- About Section Background ----------
     function saveAboutBg(blob) {
+        var file = blob;
+        if (hasCos()) {
+            var key = cosKey("about", "about-bg.jpg");
+            return uploadToCos(file, key).then(function(url) {
+                var cfg = loadSiteConfig();
+                cfg.aboutBg = url;
+                saveSiteConfig(cfg);
+            }).catch(function() {
+                return openDB().then(function(db) {
+                    return new Promise(function(res, rej) {
+                        var t = db.transaction(VIDEO_STORE, "readwrite");
+                        t.objectStore(VIDEO_STORE).put(blob, "about_bg");
+                        t.oncomplete = function() { res(); };
+                        t.onerror = function(e) { rej(e); };
+                    });
+                });
+            });
+        }
         return openDB().then(function(db) {
             return new Promise(function(res, rej) {
                 var t = db.transaction(VIDEO_STORE, "readwrite");
@@ -786,6 +951,24 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
     loadAboutBg();
     // ---------- Hero Background ----------
     function saveHeroBg(blob) {
+        var file = blob;
+        if (hasCos()) {
+            var key = cosKey("hero", "hero-bg.jpg");
+            return uploadToCos(file, key).then(function(url) {
+                var cfg = loadSiteConfig();
+                cfg.heroBg = url;
+                saveSiteConfig(cfg);
+            }).catch(function() {
+                return openDB().then(function(db) {
+                    return new Promise(function(res, rej) {
+                        var t = db.transaction(VIDEO_STORE, "readwrite");
+                        t.objectStore(VIDEO_STORE).put(blob, "hero_bg");
+                        t.oncomplete = function() { res(); };
+                        t.onerror = function(e) { rej(e); };
+                    });
+                });
+            });
+        }
         return openDB().then(function(db) {
             return new Promise(function(res, rej) {
                 var t = db.transaction(VIDEO_STORE, "readwrite");
@@ -960,7 +1143,48 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
         document.getElementById("siteSettingsModal").classList.remove("open");
     });
     var ssm = document.getElementById("siteSettingsModal");
-    if (ssm) ssm.addEventListener("click", function(e) { if (e.target === ssm) ssm.classList.remove("open"); });})(serviceItems[i]);
+    if (ssm) ssm.addEventListener("click", function(e) { if (e.target === ssm) ssm.classList.remove("open"); });
+    // ---------- COS Settings UI ----------
+    var cosBtn = document.getElementById("cosBtn");
+    if (cosBtn) cosBtn.addEventListener("click", function() {
+        var cfg = loadCosCfg() || {};
+        document.getElementById("cosBucket").value = cfg.bucket || "qaz123456-1454067625";
+        document.getElementById("cosRegion").value = cfg.region || "";
+        document.getElementById("cosSecretId").value = cfg.secretId || "";
+        document.getElementById("cosSecretKey").value = cfg.secretKey || "";
+        document.getElementById("cosStatus").innerHTML = "";
+        document.getElementById("cosModal").classList.add("open");
+    });
+    
+    document.getElementById("cosSaveBtn").addEventListener("click", function() {
+        var cfg = {
+            bucket: document.getElementById("cosBucket").value.trim(),
+            region: document.getElementById("cosRegion").value.trim(),
+            secretId: document.getElementById("cosSecretId").value.trim(),
+            secretKey: document.getElementById("cosSecretKey").value.trim()
+        };
+        var st = document.getElementById("cosStatus");
+        st.innerHTML = "\u6b63\u5728\u6d4b\u8bd5...";
+        st.style.color = "#888";
+        saveCosCfg(cfg);
+        if (!cfg.bucket || !cfg.region || !cfg.secretId || !cfg.secretKey) {
+            st.innerHTML = "\u8bf7\u586b\u5199\u5b8c\u6574"; st.style.color = "#ff6b6b"; return;
+        }
+        if (typeof COS === "undefined") {
+            st.innerHTML = "COS SDK\u5c1a\u672a\u52a0\u8f7d\uff0c\u8bf7\u5237\u65b0\u9875\u9762\u540e\u91cd\u8bd5"; st.style.color = "#ff6b6b"; return;
+        }
+        var cos = new COS({ SecretId: cfg.secretId, SecretKey: cfg.secretKey });
+        cos.getService(function(err) {
+            if (err) { st.innerHTML = "\u8fde\u63a5\u5931\u8d25\uff1a" + (err.message || JSON.stringify(err)); st.style.color = "#ff6b6b"; }
+            else { st.innerHTML = "\u2714 \u8fde\u63a5\u6210\u529f\uff01\u4e0a\u4f20\u5c06\u81ea\u52a8\u4f7f\u7528COS"; st.style.color = "#4caf50"; }
+        });
+    });
+    
+    var closeCos = function() { document.getElementById("cosModal").classList.remove("open"); };
+    document.getElementById("cosCancelBtn").addEventListener("click", closeCos);
+    document.getElementById("cosModalClose").addEventListener("click", closeCos);
+    var cm = document.getElementById("cosModal");
+    if (cm) cm.addEventListener("click", function(e) { if (e.target === cm) closeCos(); });})(serviceItems[i]);
     }
 });
 
