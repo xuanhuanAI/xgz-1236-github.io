@@ -6,7 +6,6 @@
     <title>仙侠玄幻AI — AI 影视创作者</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>✨</text></svg>">
     <link rel="stylesheet" href="css/style.css">
-    <script src="https://unpkg.com/cos-js-sdk-v5/dist/cos-js-sdk-v5.min.js" async></script>
 </head>
 <body>
 
@@ -233,13 +232,37 @@
             <button class="admin-close-btn" id="adminClose" aria-label="关闭">✕</button>
         </div>
         <div class="admin-body">
-            <div style="margin-bottom:10px">
-                <button class="btn btn-outline" id="siteSettingsBtn" style="width:100%;padding:10px 20px;font-size:13px">🏠 网站图片设置</button>
-            </div>
             <div class="admin-toolbar">
                 <button class="btn btn-primary" id="addProjectBtn" style="width:100%;padding:10px 20px;font-size:13px">+ 添加新项目</button>
             </div>
             <div class="admin-list" id="adminProjectList">
+            </div>
+        </div>
+        <div style="border-top:1px solid rgba(255,255,255,0.08);padding:16px 24px 20px">
+            <div style="display:flex;align-items:center;gap:8px;cursor:pointer" id="cosToggleBtn">
+                <span style="font-size:14px">☁️</span>
+                <span style="font-size:13px;font-weight:500">腾讯云COS配置</span>
+                <span style="font-size:10px;color:#888;margin-left:auto" id="cosToggleArrow">▼</span>
+            </div>
+            <div id="cosConfigBody" style="display:none;margin-top:12px">
+                <div class="form-group" style="margin-bottom:8px">
+                    <label class="form-label" style="font-size:11px">存储桶</label>
+                    <input type="text" class="form-input" id="cosBucket" value="qaz123456-1454067625" style="padding:8px 12px;font-size:12px">
+                </div>
+                <div class="form-group" style="margin-bottom:8px">
+                    <label class="form-label" style="font-size:11px">地域 (Region)</label>
+                    <input type="text" class="form-input" id="cosRegion" placeholder="例: ap-guangzhou" style="padding:8px 12px;font-size:12px">
+                </div>
+                <div class="form-group" style="margin-bottom:8px">
+                    <label class="form-label" style="font-size:11px">SecretId</label>
+                    <input type="text" class="form-input" id="cosSecretId" style="padding:8px 12px;font-size:12px">
+                </div>
+                <div class="form-group" style="margin-bottom:10px">
+                    <label class="form-label" style="font-size:11px">SecretKey</label>
+                    <input type="password" class="form-input" id="cosSecretKey" style="padding:8px 12px;font-size:12px">
+                </div>
+                <button class="btn btn-primary" id="cosSaveBtn" style="width:100%;padding:8px;font-size:12px">保存配置 并测试</button>
+                <div id="cosStatus" style="font-size:11px;margin-top:6px;text-align:center;min-height:18px"></div>
             </div>
         </div>
     </div>
@@ -316,82 +339,9 @@
 </div>
 
 <!-- ====== Admin Toggle Button ====== -->
+<button id="adminToggle" class="admin-toggle" aria-label="管理后台">⚙️</button>
 
-            <div class="form-group">
-                <label class="form-label">所属地域 (Region)</label>
-                <input type="text" class="form-input" id="cosRegion" placeholder="例如: ap-guangzhou / ap-shanghai">
-                <div style="font-size:11px;color:#888;margin-top:4px">COS控制台 → 存储桶列表 → 查看地域</div>
-            </div>
-            <div class="form-group">
-                <label class="form-label">SecretId</label>
-                <input type="text" class="form-input" id="cosSecretId" placeholder="API密钥管理中的 SecretId">
-            </div>
-            <div class="form-group">
-                <label class="form-label">SecretKey</label>
-                <input type="password" class="form-input" id="cosSecretKey" placeholder="API密钥管理中的 SecretKey">
-            </div>
-            <div style="display:flex;gap:12px;margin-top:24px">
-                保存并测试连接</button>
-                取消</button>
-            </div>
-            <div id="cosStatus" style="margin-top:12px;font-size:13px;text-align:center"></div>
-        </div>
-    </div>
-</div>
-
-<!-- ====== Site Settings Modal ======
-<div class="modal-overlay" id="siteSettingsModal" style="z-index:3001">
-    <div class="modal-container" style="max-width:520px">
-        <button class="modal-close" id="siteSettingsClose" aria-label="关闭"><span></span><span></span></button>
-        <div style="padding:48px 32px 24px">
-            <h3 style="font-size:18px;margin-bottom:20px">网站图片设置</h3>
-            <p style="font-size:12px;color:#888;margin-bottom:20px;line-height:1.6">
-                填写以下图片的公开URL，所有访客都能看到。<br>
-                上传文件仅当前电脑可见，URL全站可见。
-            </p>
-            <div class="form-group">
-                <label class="form-label">首页首屏背景图</label>
-                <input type="text" class="form-input" id="cfgHeroBg" placeholder="https://... 或 assets/images/hero.jpg">
-            </div>
-            <div class="form-group">
-                <label class="form-label">个人头像</label>
-                <input type="text" class="form-input" id="cfgPortrait" placeholder="https://... 或 assets/images/avatar.jpg">
-            </div>
-            <div class="form-group">
-                <label class="form-label">视觉创作者背景图</label>
-                <input type="text" class="form-input" id="cfgAboutBg" placeholder="https://... 或 assets/images/about-bg.jpg">
-            </div>
-            <div style="display:flex;gap:12px;margin-top:28px">
-                <button class="btn btn-primary"             <div style="border-top:1px solid rgba(255,255,255,0.08);padding-top:20px;margin-top:20px">
-                <h4 style="font-size:14px;margin-bottom:16px">☁️ 腾讯云COS配置</h4>
-                <p style="font-size:11px;color:#888;margin-bottom:12px">配置后上传图片/视频直接存到云端</p>
-                <div class="form-group">
-                    <label class="form-label">存储桶名称</label>
-                    <input type="text" class="form-input" id="cosBucket" value="qaz123456-1454067625">
-                </div>
-                <div class="form-group">
-                    <label class="form-label">所属地域</label>
-                    <input type="text" class="form-input" id="cosRegion" placeholder="例: ap-guangzhou">
-                </div>
-                <div class="form-group">
-                    <label class="form-label">SecretId</label>
-                    <input type="text" class="form-input" id="cosSecretId">
-                </div>
-                <div class="form-group">
-                    <label class="form-label">SecretKey</label>
-                    <input type="password" class="form-input" id="cosSecretKey">
-                </div>
-                <div id="cosStatus" style="font-size:12px;text-align:center;margin-top:8px"></div>
-            </div>
-            <div style="display:flex;gap:12px;margin-top:28px">
-                <button class="btn btn-primary" id="siteSettingsSave" style="flex:1;padding:12px">保存</button> style="flex:1;padding:12px">保存</button>
-                <button class="btn btn-outline" id="siteSettingsCancel" style="flex:1;padding:12px">取消</button>
-            </div>
-            <div id="siteSettingsStatus" style="margin-top:10px;font-size:13px;text-align:center"></div>
-        </div>
-    </div>
-</div>
-
+    <script src="https://unpkg.com/cos-js-sdk-v5/dist/cos-js-sdk-v5.min.js" async></script>
 </body>
 </html>
 

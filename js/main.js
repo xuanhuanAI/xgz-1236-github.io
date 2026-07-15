@@ -3,92 +3,34 @@
 // ============================================
 
 document.addEventListener("DOMContentLoaded", function() {
-    // ============================================
-    // Tencent Cloud COS - 直接上传到云存储
-    // ============================================
-    var COS_CFG_KEY = "cos_config";
-    
-    function loadCosCfg() {
-        try { var s = localStorage.getItem(COS_CFG_KEY); return s ? JSON.parse(s) : null; } catch(e) { return null; }
+    // ========== COS Upload ==========
+    var COS_KEY = "cos_config_site";
+    function loadCos() {
+        try { var s = localStorage.getItem(COS_KEY); return s ? JSON.parse(s) : null; } catch(e) { return null; }
     }
-    function saveCosCfg(cfg) {
-        try { localStorage.setItem(COS_CFG_KEY, JSON.stringify(cfg)); } catch(e) {}
+    function saveCos(cfg) {
+        try { localStorage.setItem(COS_KEY, JSON.stringify(cfg)); } catch(e) {}
     }
-    
-    function hasCos() {
+    function canCos() {
         if (typeof COS === "undefined") return false;
-        var cfg = loadCosCfg();
-        return cfg && cfg.secretId && cfg.secretKey && cfg.bucket && cfg.region;
+        var c = loadCos();
+        return c && c.secretId && c.secretKey && c.bucket && c.region;
     }
-    
-    function getCosBase() {
-        var cfg = loadCosCfg();
-        if (!cfg) return null;
-        return "https://" + cfg.bucket + ".cos." + cfg.region + ".myqcloud.com";
+    function getCosUrl() {
+        var c = loadCos();
+        return c ? "https://" + c.bucket + ".cos." + c.region + ".myqcloud.com" : null;
     }
-    
-    function uploadToCos(file, key) {
-        return new Promise(function(resolve, reject) {
-            if (typeof COS === "undefined") { reject(new Error("COS SDK not loaded")); return; }
-            var cfg = loadCosCfg();
-            if (!cfg) { reject(new Error("COS not configured")); return; }
-            var cos = new COS({ SecretId: cfg.secretId, SecretKey: cfg.secretKey });
-            cos.putObject({
-                Bucket: cfg.bucket,
-                Region: cfg.region,
-                Key: key,
-                Body: file
-            }, function(err, data) {
-                if (err) reject(err);
-                else resolve(getCosBase() + "/" + key);
+    function upCos(file, key) {
+        return new Promise(function(ok, no) {
+            if (typeof COS === "undefined") { no("SDK not loaded"); return; }
+            var c = loadCos();
+            if (!c) { no("Not configured"); return; }
+            new COS({SecretId: c.secretId, SecretKey: c.secretKey}).putObject({
+                Bucket: c.bucket, Region: c.region, Key: key, Body: file
+            }, function(err) {
+                err ? no(err) : ok(getCosUrl() + "/" + key);
             });
         });
-    }
-    
-    function cosKey(prefix, fileName) {
-        var ext = fileName.split(".").pop() || "bin";
-        var ts = Date.now();
-        var rand = Math.random().toString(36).substring(2, 8);
-        return prefix + "/" + ts + "_" + rand + "." + ext;
-    }
-
-    // Helper: upload file to COS, fallback to saveFn, then call callback
-    function uploadWithCos(file, cosPrefix, saveFn, callback) {
-        if (hasCos()) {
-            var key = cosKey(cosPrefix, file.name);
-            uploadToCos(file, key).then(function(url) {
-                if (callback) callback(url);
-            }).catch(function() {
-                // Fallback: save locally
-                saveFn(file).then(function() {
-                    if (callback) callback(null);
-                });
-            });
-        } else {
-            saveFn(file).then(function() {
-                if (callback) callback(null);
-            });
-        }
-    }
-    // ============================================
-    // Site Image Config - 网站图片链接配置
-    // 优先级: 公开URL > IndexedDB上传 > CSS默认
-    // ============================================
-    var SITE_CFG_KEY = "site_image_config";
-    
-    function loadSiteConfig() {
-        try {
-            var saved = localStorage.getItem(SITE_CFG_KEY);
-            return saved ? JSON.parse(saved) : {};
-        } catch(e) { return {}; }
-    }
-    function saveSiteConfig(cfg) {
-        try { localStorage.setItem(SITE_CFG_KEY, JSON.stringify(cfg)); } catch(e) {}
-    }
-    
-    function getSiteImageUrl(key) {
-        var cfg = loadSiteConfig();
-        return cfg[key] || null;
     }
     var STORAGE_KEY = "lulu_projects_data";
     var COVERS_KEY = "lulu_covers";
@@ -326,39 +268,13 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
         videoUploadInput.addEventListener("change", function(e) {
             var file = e.target.files[0];
             if (!file || !currentUploadProjectId) return;
-            var pid = currentUploadProjectId;
-            if (hasCos()) {
-                var key = cosKey("videos", file.name);
-                uploadToCos(file, key).then(function(url) {
-                    videoUploadInput.value = "";
-                    var al = loadProjects();
-                    for (var i = 0; i < al.length; i++) {
-                        if (al[i].id === pid || al[i].id == pid) {
-                            if (!al[i].detail) al[i].detail = {};
-                            al[i].detail.videoUrl = url;
-                            saveProjects(al);
-                            openModal(al[i]);
-                            break;
-                        }
-                    }
-                }).catch(function() {
-                    saveVideoDB(pid, file).then(function() {
-                        videoUploadInput.value = "";
-                        var al = loadProjects();
-                        for (var i = 0; i < al.length; i++) {
-                            if (al[i].id === pid) { openModal(al[i]); break; }
-                        }
-                    });
-                });
-            } else {
-                saveVideoDB(pid, file).then(function() {
-                    videoUploadInput.value = "";
-                    var al = loadProjects();
-                    for (var i = 0; i < al.length; i++) {
-                        if (al[i].id === pid) { openModal(al[i]); break; }
-                    }
-                }).catch(function() { alert("上传失败，请重试"); });
-            }
+            saveVideoDB(currentUploadProjectId, file).then(function() {
+                videoUploadInput.value = "";
+                var all = loadProjects();
+                for (var i = 0; i < all.length; i++) {
+                    if (all[i].id === currentUploadProjectId) { openModal(all[i]); break; }
+                }
+            }).catch(function() { alert("上传失败，请重试"); });
         });
     }
 
@@ -548,48 +464,12 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
         saveProjects(all);
 
         if (formCoverFile.files[0]) {
-            if (hasCos()) {
-                var file = formCoverFile.files[0];
-                var key = cosKey("covers", file.name);
-                var thatId = id;
-                uploadToCos(file, key).then(function(url) {
-                    var al = loadProjects();
-                    for (var i = 0; i < al.length; i++) {
-                        if (al[i].id === thatId || al[i].id == thatId) { al[i].coverUrl = url; break; }
-                    }
-                    saveProjects(al);
-                }).catch(function() {
-                    var r = new FileReader();
-                    r.onload = function(ev) { saveCover(thatId, ev.target.result); };
-                    r.readAsDataURL(file);
-                });
-            } else {
-                var r = new FileReader();
-                r.onload = function(ev) { saveCover(id, ev.target.result); };
-                r.readAsDataURL(file);
-            }
+            var r = new FileReader();
+            r.onload = function(ev) { saveCover(id, ev.target.result); };
+            r.readAsDataURL(formCoverFile.files[0]);
         }
         if (formVideoFile.files[0]) {
-            if (hasCos()) {
-                var file = formVideoFile.files[0];
-                var key = cosKey("videos", file.name);
-                var thatId = id;
-                uploadToCos(file, key).then(function(url) {
-                    var al = loadProjects();
-                    for (var i = 0; i < al.length; i++) {
-                        if (al[i].id === thatId || al[i].id == thatId) {
-                            if (!al[i].detail) al[i].detail = {};
-                            al[i].detail.videoUrl = url;
-                            break;
-                        }
-                    }
-                    saveProjects(al);
-                }).catch(function() {
-                    saveVideoDB(thatId, file);
-                });
-            } else {
-                saveVideoDB(id, formVideoFile.files[0]);
-            }
+            saveVideoDB(id, formVideoFile.files[0]);
         }
 
         formModal.classList.remove("open");
@@ -706,31 +586,15 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
     // ---------- Portrait Upload (About section) ----------
     function savePortrait(blob) {
         var file = blob;
-        if (hasCos()) {
-            var key = cosKey("portrait", "avatar.jpg");
-            return uploadToCos(file, key).then(function(url) {
-                var cfg = loadSiteConfig();
-                cfg.portrait = url;
-                saveSiteConfig(cfg);
+        if (canCos()) {
+            var key = "site/portrait_" + Date.now() + ".jpg";
+            return upCos(file, key).then(function(url) {
+                try { localStorage.setItem("cos_portrait_url", url); } catch(e) {}
             }).catch(function() {
-                return openDB().then(function(db) {
-                    return new Promise(function(res, rej) {
-                        var t = db.transaction(VIDEO_STORE, "readwrite");
-                        t.objectStore(VIDEO_STORE).put(blob, "portrait");
-                        t.oncomplete = function() { res(); };
-                        t.onerror = function(e) { rej(e); };
-                    });
-                });
+                return saveToDB(blob, "portrait");
             });
         }
-        return openDB().then(function(db) {
-            return new Promise(function(res, rej) {
-                var t = db.transaction(VIDEO_STORE, "readwrite");
-                t.objectStore(VIDEO_STORE).put(blob, "portrait");
-                t.oncomplete = function() { res(); };
-                t.onerror = function(e) { rej(e); };
-            });
-        });
+        return saveToDB(blob, "portrait");
     }
     function getPortrait() {
         return openDB().then(function(db) {
@@ -756,11 +620,12 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
     }
 
     function loadPortrait() {
-        var cfgUrl = getSiteImageUrl("portrait");
-        if (cfgUrl) {
+        var cosUrl = null;
+        try { cosUrl = localStorage.getItem("cos_portrait_url"); } catch(e) {}
+        if (cosUrl) {
             var ph = document.querySelector(".about-portrait-placeholder");
             if (ph) {
-                ph.style.cssText = "width:180px;height:180px;border-radius:50%;background:url(" + cfgUrl + ") center/cover no-repeat;overflow:hidden";
+                ph.style.cssText = "width:180px;height:180px;border-radius:50%;background:url(" + cosUrl + ") center/cover no-repeat;overflow:hidden";
                 ph.innerHTML = "";
             }
             return;
@@ -820,31 +685,15 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
     // ---------- About Section Background ----------
     function saveAboutBg(blob) {
         var file = blob;
-        if (hasCos()) {
-            var key = cosKey("about", "about-bg.jpg");
-            return uploadToCos(file, key).then(function(url) {
-                var cfg = loadSiteConfig();
-                cfg.aboutBg = url;
-                saveSiteConfig(cfg);
+        if (canCos()) {
+            var key = "site/about_" + Date.now() + ".jpg";
+            return upCos(file, key).then(function(url) {
+                try { localStorage.setItem("cos_about_url", url); } catch(e) {}
             }).catch(function() {
-                return openDB().then(function(db) {
-                    return new Promise(function(res, rej) {
-                        var t = db.transaction(VIDEO_STORE, "readwrite");
-                        t.objectStore(VIDEO_STORE).put(blob, "about_bg");
-                        t.oncomplete = function() { res(); };
-                        t.onerror = function(e) { rej(e); };
-                    });
-                });
+                return saveToDB(blob, "about_bg");
             });
         }
-        return openDB().then(function(db) {
-            return new Promise(function(res, rej) {
-                var t = db.transaction(VIDEO_STORE, "readwrite");
-                t.objectStore(VIDEO_STORE).put(blob, "about_bg");
-                t.oncomplete = function() { res(); };
-                t.onerror = function(e) { rej(e); };
-            });
-        });
+        return saveToDB(blob, "about_bg");
     }
     function getAboutBg() {
         return openDB().then(function(db) {
@@ -869,11 +718,12 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
         });
     }
     function loadAboutBg() {
-        var cfgUrl = getSiteImageUrl("aboutBg");
-        if (cfgUrl) {
+        var cosUrl = null;
+        try { cosUrl = localStorage.getItem("cos_about_url"); } catch(e) {}
+        if (cosUrl) {
             var sec = document.getElementById("about");
             if (sec) {
-                sec.style.background = "url(" + cfgUrl + ") center/cover no-repeat fixed";
+                sec.style.background = "url(" + cosUrl + ") center/cover no-repeat fixed";
                 sec.style.position = "relative";
                 var existing = sec.querySelector(".about-bg-overlay");
                 if (!existing) {
@@ -901,6 +751,7 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
                         ov.style.cssText = "position:absolute;inset:0;background:rgba(0,0,0,0.6);z-index:0";
                         sec.insertBefore(ov, sec.firstChild);
                     }
+                    // Make sure content is above overlay
                     var container = sec.querySelector(".section-container");
                     if (container) container.style.position = "relative";
                     if (container) container.style.zIndex = "1";
@@ -952,27 +803,21 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
     // ---------- Hero Background ----------
     function saveHeroBg(blob) {
         var file = blob;
-        if (hasCos()) {
-            var key = cosKey("hero", "hero-bg.jpg");
-            return uploadToCos(file, key).then(function(url) {
-                var cfg = loadSiteConfig();
-                cfg.heroBg = url;
-                saveSiteConfig(cfg);
+        if (canCos()) {
+            var key = "site/hero_" + Date.now() + ".jpg";
+            return upCos(file, key).then(function(url) {
+                try { localStorage.setItem("cos_hero_url", url); } catch(e) {}
             }).catch(function() {
-                return openDB().then(function(db) {
-                    return new Promise(function(res, rej) {
-                        var t = db.transaction(VIDEO_STORE, "readwrite");
-                        t.objectStore(VIDEO_STORE).put(blob, "hero_bg");
-                        t.oncomplete = function() { res(); };
-                        t.onerror = function(e) { rej(e); };
-                    });
-                });
+                return saveToDB(blob, "hero_bg");
             });
         }
+        return saveToDB(blob, "hero_bg");
+    }
+    function saveToDB(blob, storeKey) {
         return openDB().then(function(db) {
             return new Promise(function(res, rej) {
                 var t = db.transaction(VIDEO_STORE, "readwrite");
-                t.objectStore(VIDEO_STORE).put(blob, "hero_bg");
+                t.objectStore(VIDEO_STORE).put(blob, storeKey);
                 t.oncomplete = function() { res(); };
                 t.onerror = function(e) { rej(e); };
             });
@@ -1001,11 +846,12 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
         });
     }
     function loadHeroBg() {
-        var cfgUrl = getSiteImageUrl("heroBg");
-        if (cfgUrl) {
+        var cosUrl = null;
+        try { cosUrl = localStorage.getItem("cos_hero_url"); } catch(e) {}
+        if (cosUrl) {
             var heroBg = document.querySelector(".hero-bg");
             if (heroBg) {
-                heroBg.style.background = "url(" + cfgUrl + ") center/cover no-repeat";
+                heroBg.style.background = "url(" + cosUrl + ") center/cover no-repeat";
                 heroBg.style.position = "absolute";
                 heroBg.style.inset = "0";
                 heroBg.style.zIndex = "0";
@@ -1027,6 +873,7 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
                     heroBg.style.position = "absolute";
                     heroBg.style.inset = "0";
                     heroBg.style.zIndex = "0";
+                    // Clear the pseudo-element light effects by adding dark overlay
                     var existing = heroBg.parentNode.querySelector(".hero-bg-overlay");
                     if (!existing) {
                         var ov = document.createElement("div");
@@ -1078,7 +925,49 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
         });
     });
 
-    loadHeroBg();
+    
+    // ---------- COS Settings UI ----------
+    var cosToggle = document.getElementById("cosToggleBtn");
+    var cosBody = document.getElementById("cosConfigBody");
+    var cosArrow = document.getElementById("cosToggleArrow");
+    if (cosToggle && cosBody) {
+        cosToggle.addEventListener("click", function() {
+            var show = cosBody.style.display !== "block";
+            cosBody.style.display = show ? "block" : "none";
+            if (cosArrow) cosArrow.textContent = show ? "\u25b2" : "\u25bc";
+            if (show) {
+                var c = loadCos() || {};
+                document.getElementById("cosBucket").value = c.bucket || "qaz123456-1454067625";
+                document.getElementById("cosRegion").value = c.region || "";
+                document.getElementById("cosSecretId").value = c.secretId || "";
+                document.getElementById("cosSecretKey").value = c.secretKey || "";
+                var st = document.getElementById("cosStatus");
+                if (c.secretId) st.innerHTML = "\u2714 \u5df2\u914d\u7f6e"; else st.innerHTML = "";
+            }
+        });
+    }
+    document.getElementById("cosSaveBtn").addEventListener("click", function() {
+        var cfg = {
+            bucket: document.getElementById("cosBucket").value.trim(),
+            region: document.getElementById("cosRegion").value.trim(),
+            secretId: document.getElementById("cosSecretId").value.trim(),
+            secretKey: document.getElementById("cosSecretKey").value.trim()
+        };
+        var st = document.getElementById("cosStatus");
+        saveCos(cfg);
+        if (!cfg.bucket || !cfg.region || !cfg.secretId || !cfg.secretKey) {
+            st.innerHTML = "\u8bf7\u586b\u5199\u5b8c\u6574"; st.style.color = "#ff6b6b"; return;
+        }
+        if (typeof COS === "undefined") {
+            st.innerHTML = "SDK\u5c1a\u672a\u52a0\u8f7d\uff0c\u8bf7\u5237\u65b0\u9875\u9762"; st.style.color = "#888"; return;
+        }
+        st.innerHTML = "\u6d4b\u8bd5\u4e2d..."; st.style.color = "#888";
+        new COS({SecretId: cfg.secretId, SecretKey: cfg.secretKey}).getService(function(err) {
+            st.innerHTML = err ? "\u274c " + (err.message || "\u5931\u8d25") : "\u2714 \u8fde\u63a5\u6210\u529f\uff01";
+            st.style.color = err ? "#ff6b6b" : "#4caf50";
+        });
+    });
+loadHeroBg();
     // ---------- Service Item Clicks (scroll to work + filter) ----------
     var serviceMap = {
         "AI短剧": "short-drama",
@@ -1107,72 +996,7 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
                     if (target) target.click();
                 }, 400);
             });
-        
-    // ---------- Site Settings UI ----------
-    function openSiteSettings() {
-        var cfg = loadSiteConfig();
-        document.getElementById("cfgHeroBg").value = cfg.heroBg || "";
-        document.getElementById("cfgPortrait").value = cfg.portrait || "";
-        document.getElementById("cfgAboutBg").value = cfg.aboutBg || "";
-        var cosCfg = loadCosCfg() || {};
-        document.getElementById("cosBucket").value = cosCfg.bucket || "qaz123456-1454067625";
-        document.getElementById("cosRegion").value = cosCfg.region || "";
-        document.getElementById("cosSecretId").value = cosCfg.secretId || "";
-        document.getElementById("cosSecretKey").value = cosCfg.secretKey || "";
-        document.getElementById("cosStatus").innerHTML = cosCfg.secretId ? "\u2714 COS\u5df2\u914d\u7f6e" : "";
-        document.getElementById("cosStatus").style.color = cosCfg.secretId ? "#4caf50" : "#888";
-        document.getElementById("siteSettingsStatus").innerHTML = "";
-        document.getElementById("siteSettingsModal").classList.add("open");
-    }
-    
-    var siteSetBtn = document.getElementById("siteSettingsBtn");
-    if (siteSetBtn) siteSetBtn.addEventListener("click", function(e) { e.stopPropagation();
-        var adminPanel = document.getElementById("adminPanel");
-        if (adminPanel) adminPanel.classList.remove("open");
-        openSiteSettings();
-    });
-    
-    document.getElementById("siteSettingsSave").addEventListener("click", function() {
-        var cfg = {
-            heroBg: document.getElementById("cfgHeroBg").value.trim(),
-            portrait: document.getElementById("cfgPortrait").value.trim(),
-            aboutBg: document.getElementById("cfgAboutBg").value.trim()
-        };
-        saveSiteConfig(cfg);
-        var cosCfg = {
-            bucket: document.getElementById("cosBucket").value.trim(),
-            region: document.getElementById("cosRegion").value.trim(),
-            secretId: document.getElementById("cosSecretId").value.trim(),
-            secretKey: document.getElementById("cosSecretKey").value.trim()
-        };
-        saveCosCfg(cosCfg);
-        loadHeroBg();
-        loadPortrait();
-        loadAboutBg();
-        var st = document.getElementById("cosStatus");
-        if (cosCfg.secretId && typeof COS !== "undefined") {
-            var cos = new COS({ SecretId: cosCfg.secretId, SecretKey: cosCfg.secretKey });
-            cos.getService(function(err) {
-                st.innerHTML = err ? "\u274c " + (err.message || "\u8fde\u63a5\u5931\u8d25") : "\u2714 COS\u8fde\u63a5\u6210\u529f";
-                st.style.color = err ? "#ff6b6b" : "#4caf50";
-            });
-        } else {
-            st.innerHTML = cosCfg.secretId ? "COS SDK\u5c1a\u672a\u52a0\u8f7d\uff0c\u8bf7\u5237\u65b0" : "";
-        }
-        document.getElementById("siteSettingsStatus").innerHTML = "\u2714 \u4fdd\u5b58\u6210\u529f\uff01";
-        document.getElementById("siteSettingsStatus").style.color = "#4caf50";
-        setTimeout(function() { document.getElementById("siteSettingsModal").classList.remove("open"); }, 1500);
-    });
-    
-    document.getElementById("siteSettingsCancel").addEventListener("click", function() {
-        document.getElementById("siteSettingsModal").classList.remove("open");
-    });
-    document.getElementById("siteSettingsClose").addEventListener("click", function() {
-        document.getElementById("siteSettingsModal").classList.remove("open");
-    });
-    var ssm = document.getElementById("siteSettingsModal");
-    if (ssm) ssm.addEventListener("click", function(e) { if (e.target === ssm) ssm.classList.remove("open"); });
-    })(serviceItems[i]);
+        })(serviceItems[i]);
     }
 });
 
