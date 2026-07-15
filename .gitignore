@@ -1,0 +1,7 @@
+# Ignore Python scripts
+work/
+# Keep .gitkeep files
+!.gitkeep
+
+# Temp files
+*.txt

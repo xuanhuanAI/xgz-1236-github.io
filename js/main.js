@@ -3,6 +3,138 @@
 // ============================================
 
 document.addEventListener("DOMContentLoaded", function() {
+    // ============================================
+    // Tencent Cloud COS Integration
+    // ============================================
+    var COS_CONFIG_KEY = "cos_config";
+    
+    function loadCosConfig() {
+        try {
+            var saved = localStorage.getItem(COS_CONFIG_KEY);
+            return saved ? JSON.parse(saved) : null;
+        } catch(e) { return null; }
+    }
+    
+    function saveCosConfig(config) {
+        try { localStorage.setItem(COS_CONFIG_KEY, JSON.stringify(config)); } catch(e) {}
+    }
+    
+    function getCosInstance() {
+        var cfg = loadCosConfig();
+        if (!cfg || !cfg.secretId || !cfg.secretKey || !cfg.bucket || !cfg.region) return null;
+        try {
+            return new COS({
+                SecretId: cfg.secretId,
+                SecretKey: cfg.secretKey
+            });
+        } catch(e) { return null; }
+    }
+    
+    function getCosBaseUrl() {
+        var cfg = loadCosConfig();
+        if (!cfg || !cfg.bucket || !cfg.region) return null;
+        return "https://" + cfg.bucket + ".cos." + cfg.region + ".myqcloud.com";
+    }
+    
+    function uploadToCos(file, key, onProgress) {
+        return new Promise(function(resolve, reject) {
+            var cos = getCosInstance();
+            if (!cos) {
+                reject(new Error("COS not configured"));
+                return;
+            }
+            var cfg = loadCosConfig();
+            cos.putObject({
+                Bucket: cfg.bucket,
+                Region: cfg.region,
+                Key: key,
+                Body: file,
+                onProgress: function(progressData) {
+                    if (onProgress) onProgress(progressData.percent);
+                }
+            }, function(err, data) {
+                if (err) {
+                    reject(err);
+                } else {
+                    resolve(getCosBaseUrl() + "/" + key);
+                }
+            });
+        });
+    }
+    
+    function generateCosKey(prefix, fileName) {
+        var ext = fileName.split(".").pop() || "bin";
+        var ts = Date.now();
+        var random = Math.random().toString(36).substring(2, 8);
+        return prefix + "/" + ts + "_" + random + "." + ext;
+    }
+
+    // ---------- COS Settings UI ----------
+    function openCosSettings() {
+        var cfg = loadCosConfig() || {};
+        document.getElementById("cosBucket").value = cfg.bucket || "qaz123456-1454067625";
+        document.getElementById("cosRegion").value = cfg.region || "";
+        document.getElementById("cosSecretId").value = cfg.secretId || "";
+        document.getElementById("cosSecretKey").value = cfg.secretKey || "";
+        document.getElementById("cosStatus").innerHTML = "";
+        document.getElementById("cosModal").classList.add("open");
+    }
+    
+    function setupCosUI() {
+        var cosBtn = document.getElementById("cosSettingsBtn");
+        if (cosBtn) cosBtn.addEventListener("click", openCosSettings);
+        
+        var cosSaveBtn = document.getElementById("cosSaveBtn");
+        if (cosSaveBtn) {
+            cosSaveBtn.addEventListener("click", function() {
+                var config = {
+                    bucket: document.getElementById("cosBucket").value.trim(),
+                    region: document.getElementById("cosRegion").value.trim(),
+                    secretId: document.getElementById("cosSecretId").value.trim(),
+                    secretKey: document.getElementById("cosSecretKey").value.trim()
+                };
+                var statusEl = document.getElementById("cosStatus");
+                statusEl.innerHTML = "\u6b63\u5728\u6d4b\u8bd5\u8fde\u63a5...";
+                statusEl.style.color = "#888";
+                
+                // Save first, then test
+                saveCosConfig(config);
+                
+                if (!config.bucket || !config.region || !config.secretId || !config.secretKey) {
+                    statusEl.innerHTML = "\u8bf7\u586b\u5199\u5b8c\u6574\u7684\u914d\u7f6e\u4fe1\u606f";
+                    statusEl.style.color = "#ff6b6b";
+                    return;
+                }
+                
+                var cos = getCosInstance();
+                if (!cos) {
+                    statusEl.innerHTML = "SDK\u521d\u59cb\u5316\u5931\u8d25\uff0c\u8bf7\u68c0\u67e5\u914d\u7f6e";
+                    statusEl.style.color = "#ff6b6b";
+                    return;
+                }
+                
+                cos.getService(function(err, data) {
+                    if (err) {
+                        statusEl.innerHTML = "\u8fde\u63a5\u5931\u8d25\uff1a" + (err.message || err.error || JSON.stringify(err));
+                        statusEl.style.color = "#ff6b6b";
+                        return;
+                    }
+                    statusEl.innerHTML = "\u2714 \u8fde\u63a5\u6210\u529f\uff01\u53ef\u4ee5\u5f00\u59cb\u4e0a\u4f20\u6587\u4ef6\u4e86";
+                    statusEl.style.color = "#4caf50";
+                });
+            });
+        }
+        
+        var cosCancel = document.getElementById("cosCancelBtn");
+        if (cosCancel) cosCancel.addEventListener("click", function() { document.getElementById("cosModal").classList.remove("open"); });
+        
+        var cosClose = document.getElementById("cosModalClose");
+        if (cosClose) cosClose.addEventListener("click", function() { document.getElementById("cosModal").classList.remove("open"); });
+        
+        var cosModal = document.getElementById("cosModal");
+        if (cosModal) cosModal.addEventListener("click", function(e) { if (e.target === cosModal) cosModal.classList.remove("open"); });
+    }
+
     var STORAGE_KEY = "lulu_projects_data";
     var COVERS_KEY = "lulu_covers";
     var DB_NAME = "LuluStudioDB";
@@ -166,33 +298,18 @@ document.addEventListener("DOMContentLoaded", function() {
 
         var mediaDiv = modalContent.querySelector(".modal-media");
 
-        // ---- Handle video + cover buttons ----
-        getVideoDB(project.id).then(function(videoUrl) {
-            if (videoUrl) {
-                mediaDiv.innerHTML = "<video class=\"modal-video\" src=\"" + videoUrl + "\" controls preload=\"metadata\" playsinline style=\"width:100%;display:block;background:#1a1a1a;max-height:500px;border-radius:14px\"></video>";
-            } else if (detail.video) {
-                mediaDiv.innerHTML = "<video class=\"modal-video\" src=\"" + detail.video + "\" controls preload=\"metadata\" playsinline style=\"width:100%;display:block;background:#1a1a1a;max-height:500px;border-radius:14px\"></video>";
-            } else {
-                var uploadDiv = document.createElement("div");
-                uploadDiv.className = "modal-video-upload";
-                uploadDiv.innerHTML = "<button class=\"btn-upload-video\">上传视频到此项目</button>";
-                mediaDiv.appendChild(uploadDiv);
-                uploadDiv.querySelector("button").addEventListener("click", function() {
-                    currentUploadProjectId = project.id;
-                    videoUploadInput.click();
-                });
-            }
-
-            // ---- Cover change & delete video buttons ----
+                // ---- Handle video + cover buttons ----
+        // 视频优先级: detail.videoUrl > IndexedDB上传 > detail.video > 上传按钮
+        function renderVideoActions(hasVideo_local) {
             var actionsDiv = document.createElement("div");
             actionsDiv.style.cssText = "margin-top:20px;display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap";
-            var hasVideo = !!(videoUrl || detail.video);
+            var hasV = !!(detail.videoUrl || hasVideo_local || detail.video);
             actionsDiv.innerHTML =
                 "<button class=\"btn-upload-video\" id=\"changeCoverBtn\" style=\"font-size:12px;padding:8px 20px\">🖼 更换封面</button>" +
-                (hasVideo ? "<button class=\"btn-upload-video\" id=\"deleteVideoBtn\" style=\"font-size:12px;padding:8px 20px;color:#ff6b6b;border-color:rgba(255,68,68,0.2)\">🗑 删除视频</button>" : "");
+                (hasV ? "<button class=\"btn-upload-video\" id=\"deleteVideoBtn\" style=\"font-size:12px;padding:8px 20px;color:#ff6b6b;border-color:rgba(255,68,68,0.2)\">🗑 删除视频</button>" : "");
             modalContent.appendChild(actionsDiv);
 
-            document.getElementById("changeCoverBtn").addEventListener("click", function() {
+            ﻿document.getElementById("changeCoverBtn").addEventListener("click", function() {
                 var inp = document.createElement("input");
                 inp.type = "file"; inp.accept = "image/*";
                 inp.style.display = "none";
@@ -200,15 +317,43 @@ document.addEventListener("DOMContentLoaded", function() {
                 inp.click();
                 inp.addEventListener("change", function() {
                     if (!inp.files[0]) { document.body.removeChild(inp); return; }
-                    var r = new FileReader();
-                    r.onload = function(ev) {
-                        saveCover(project.id, ev.target.result);
-                        document.body.removeChild(inp);
-                        openModal(project);
-                    };
-                    r.readAsDataURL(inp.files[0]);
+                    var file = inp.files[0];
+                    var cos = getCosInstance();
+                    if (cos) {
+                        var cosKey = generateCosKey("covers", file.name);
+                        uploadToCos(file, cosKey, null).then(function(url) {
+                            document.body.removeChild(inp);
+                            var all = loadProjects();
+                            for (var i = 0; i < all.length; i++) {
+                                if (all[i].id === project.id || all[i].id == project.id) {
+                                    all[i].coverUrl = url;
+                                    break;
+                                }
+                            }
+                            saveProjects(all);
+                            openModal(project);
+                            alert("封面已上传到云端");
+                        }).catch(function() {
+                            var r = new FileReader();
+                            r.onload = function(ev) {
+                                saveCover(project.id, ev.target.result);
+                                document.body.removeChild(inp);
+                                openModal(project);
+                            };
+                            r.readAsDataURL(file);
+                        });
+                    } else {
+                        var r = new FileReader();
+                        r.onload = function(ev) {
+                            saveCover(project.id, ev.target.result);
+                            document.body.removeChild(inp);
+                            openModal(project);
+                        };
+                        r.readAsDataURL(file);
+                    }
                 });
             });
+
 
             var delBtn = document.getElementById("deleteVideoBtn");
             if (delBtn) {
@@ -218,9 +363,30 @@ document.addEventListener("DOMContentLoaded", function() {
                     }
                 });
             }
-        });
+        }
 
-        document.body.style.overflow = "hidden";
+        if (detail.videoUrl) {
+            mediaDiv.innerHTML = "<video class=\"modal-video\" src=\"" + detail.videoUrl + "\" controls preload=\"metadata\" playsinline style=\"width:100%;display:block;background:#1a1a1a;max-height:500px;border-radius:14px\"></video>";
+            renderVideoActions(null);
+        } else {
+            getVideoDB(project.id).then(function(videoUrl) {
+                if (videoUrl) {
+                    mediaDiv.innerHTML = "<video class=\"modal-video\" src=\"" + videoUrl + "\" controls preload=\"metadata\" playsinline style=\"width:100%;display:block;background:#1a1a1a;max-height:500px;border-radius:14px\"></video>";
+                } else if (detail.video) {
+                    mediaDiv.innerHTML = "<video class=\"modal-video\" src=\"" + detail.video + "\" controls preload=\"metadata\" playsinline style=\"width:100%;display:block;background:#1a1a1a;max-height:500px;border-radius:14px\"></video>";
+                } else {
+                    var uploadDiv = document.createElement("div");
+                    uploadDiv.className = "modal-video-upload";
+                    uploadDiv.innerHTML = "<button class=\"btn-upload-video\">上传视频到此项目</button>";
+                    mediaDiv.appendChild(uploadDiv);
+                    uploadDiv.querySelector("button").addEventListener("click", function() {
+                        currentUploadProjectId = project.id;
+                        videoUploadInput.click();
+                    });
+                }
+                renderVideoActions(videoUrl);
+            });
+        }document.body.style.overflow = "hidden";
         modal.classList.add("open");
     }
 function closeModal() { modal.classList.remove("open"); document.body.style.overflow = ""; }
@@ -233,13 +399,39 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
         videoUploadInput.addEventListener("change", function(e) {
             var file = e.target.files[0];
             if (!file || !currentUploadProjectId) return;
-            saveVideoDB(currentUploadProjectId, file).then(function() {
-                videoUploadInput.value = "";
-                var all = loadProjects();
-                for (var i = 0; i < all.length; i++) {
-                    if (all[i].id === currentUploadProjectId) { openModal(all[i]); break; }
-                }
-            }).catch(function() { alert("上传失败，请重试"); });
+            var cos = getCosInstance();
+            if (cos) {
+                var cosKey = generateCosKey("videos", file.name);
+                uploadToCos(file, cosKey, null).then(function(url) {
+                    videoUploadInput.value = "";
+                    var all = loadProjects();
+                    for (var i = 0; i < all.length; i++) {
+                        if (all[i].id === currentUploadProjectId) {
+                            if (!all[i].detail) all[i].detail = {};
+                            all[i].detail.videoUrl = url;
+                            saveProjects(all);
+                            openModal(all[i]);
+                            break;
+                        }
+                    }
+                }).catch(function() {
+                    saveVideoDB(currentUploadProjectId, file).then(function() {
+                        videoUploadInput.value = "";
+                        var all = loadProjects();
+                        for (var i = 0; i < all.length; i++) {
+                            if (all[i].id === currentUploadProjectId) { openModal(all[i]); break; }
+                        }
+                    });
+                });
+            } else {
+                saveVideoDB(currentUploadProjectId, file).then(function() {
+                    videoUploadInput.value = "";
+                    var all = loadProjects();
+                    for (var i = 0; i < all.length; i++) {
+                        if (all[i].id === currentUploadProjectId) { openModal(all[i]); break; }
+                    }
+                }).catch(function() { alert("上传失败，请重试"); });
+            }
         });
     }
 
@@ -375,6 +567,8 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
         formCoverPreview.innerHTML = "";
         formCoverFile.value = "";
         formVideoFile.value = "";
+        document.getElementById("formCoverUrl").value = project ? (project.coverUrl || "") : "";
+        document.getElementById("formVideoUrl").value = (project && project.detail) ? (project.detail.videoUrl || "") : "";
     }
 
         formCancel.addEventListener("click", function() { formModal.classList.remove("open"); });
@@ -405,6 +599,8 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
                     if (!all[i].detail) all[i].detail = {};
                     all[i].detail.subtitle = subtitle;
                     all[i].detail.highlights = hlList;
+                    all[i].coverUrl = document.getElementById("formCoverUrl").value.trim() || "";
+                    all[i].detail.videoUrl = document.getElementById("formVideoUrl").value.trim() || "";
                     break;
                 }
             }
@@ -415,22 +611,63 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
                 typeLabel: typeLabels[type] || type,
                 highlight: highlight || "",
                 colors: ["#1a1a2e","#16213e","#0f3460"],
-                detail: { subtitle: subtitle || "", highlights: hlList, video: "" }
+                coverUrl: document.getElementById("formCoverUrl").value.trim() || "",
+                detail: { subtitle: subtitle || "", highlights: hlList, video: "", videoUrl: document.getElementById("formVideoUrl").value.trim() || "" }
             };
             all.push(np);
             id = newId;
         }
 
-        saveProjects(all);
+﻿        saveProjects(all);
 
         if (formCoverFile.files[0]) {
-            var r = new FileReader();
-            r.onload = function(ev) { saveCover(id, ev.target.result); };
-            r.readAsDataURL(formCoverFile.files[0]);
+            var cos = getCosInstance();
+            var file = formCoverFile.files[0];
+            if (cos) {
+                var cosKey = generateCosKey("covers", file.name);
+                uploadToCos(file, cosKey, null).then(function(url) {
+                    all = loadProjects();
+                    for (var i = 0; i < all.length; i++) {
+                        if (all[i].id === id || all[i].id == id) {
+                            all[i].coverUrl = url;
+                            break;
+                        }
+                    }
+                    saveProjects(all);
+                }).catch(function() {
+                    var r = new FileReader();
+                    r.onload = function(ev) { saveCover(id, ev.target.result); };
+                    r.readAsDataURL(file);
+                });
+            } else {
+                var r = new FileReader();
+                r.onload = function(ev) { saveCover(id, ev.target.result); };
+                r.readAsDataURL(file);
+            }
         }
         if (formVideoFile.files[0]) {
-            saveVideoDB(id, formVideoFile.files[0]);
+            var cos = getCosInstance();
+            var file = formVideoFile.files[0];
+            if (cos) {
+                var cosKey = generateCosKey("videos", file.name);
+                uploadToCos(file, cosKey, null).then(function(url) {
+                    all = loadProjects();
+                    for (var i = 0; i < all.length; i++) {
+                        if (all[i].id === id || all[i].id == id) {
+                            if (!all[i].detail) all[i].detail = {};
+                            all[i].detail.videoUrl = url;
+                            break;
+                        }
+                    }
+                    saveProjects(all);
+                }).catch(function() {
+                    saveVideoDB(id, file);
+                });
+            } else {
+                saveVideoDB(id, file);
+            }
         }
+
 
         formModal.classList.remove("open");
         renderAdminList();
@@ -802,6 +1039,7 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
             saveHeroBg(inp.files[0]).then(function() {
                 document.body.removeChild(inp);
                 loadHeroBg();
+    setupCosUI();
                 alert("首页背景已更新！");
             }).catch(function() { alert("上传失败"); });
         });
