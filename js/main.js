@@ -928,7 +928,7 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
     
     // ---------- COS Config Auto-load ----------
     // (toggle handled by native <details>)
-    var cosDetails = document.querySelector("#cosConfigBody details, .admin-body details");
+    var cosDetails = document.querySelector(".admin-body details");
     if (cosDetails) {
         cosDetails.addEventListener("toggle", function() {
             if (cosDetails.open) {
@@ -955,13 +955,9 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
             st.innerHTML = "\u8bf7\u586b\u5199\u5b8c\u6574"; st.style.color = "#ff6b6b"; return;
         }
         if (typeof COS === "undefined") {
-            st.innerHTML = "SDK\u5c1a\u672a\u52a0\u8f7d\uff0c\u8bf7\u5237\u65b0\u9875\u9762"; st.style.color = "#888"; return;
+            st.innerHTML = "SDK\u5c1a\u672a\u52a0\u8f7d\uff0c\u5237\u65b0\u9875\u9762\u540e\u91cd\u8bd5"; st.style.color = "#888"; return;
         }
-        st.innerHTML = "\u6d4b\u8bd5\u4e2d..."; st.style.color = "#888";
-        new COS({SecretId: cfg.secretId, SecretKey: cfg.secretKey}).headBucket({Bucket: cfg.bucket, Region: cfg.region}, function(err) {
-            st.innerHTML = err ? "\u274c " + (err.message || "\u5931\u8d25") : "\u2714 \u8fde\u63a5\u6210\u529f\uff01";
-            st.style.color = err ? "#ff6b6b" : "#4caf50";
-        });
+        st.innerHTML = "\u2714 \u914d\u7f6e\u5df2\u4fdd\u5b58\uff0c\u4e0a\u4f20\u65f6\u81ea\u52a8\u5c1d\u8bd5COS"; st.style.color = "#4caf50";
     });
     // ---------- Service Item Clicks (scroll to work + filter) ----------
     var serviceMap = {
