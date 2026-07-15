@@ -104,40 +104,57 @@ document.addEventListener("DOMContentLoaded", function() {
     }
     function upCos(file, key) {
         var cfg = loadCos();
-        if (!cfg) return Promise.reject(new Error("COS 未配置"));
+        if (!cfg) return Promise.reject(new Error("COS \u672a\u914d\u7f6e"));
         var host = cfg.bucket + ".cos." + cfg.region + ".myqcloud.com";
         var cPath = "/" + encPath(key);
         var url = "https://" + host + cPath;
         var now = Math.floor(Date.now() / 1000);
         var kt = now + ";" + (now + 86400);
-        var auth = buildCosAuth("PUT", cPath, cfg, kt, file.type || "application/octet-stream");
-            return new Promise(function(resolve, reject) {
-                var xhr = new XMLHttpRequest();
-                xhr.open("PUT", url, true);
-                xhr.setRequestHeader("Authorization", auth);
-                xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
-                xhr.onload = function() {
-                    if (xhr.status >= 200 && xhr.status < 300) {
-                        resolve(url + "?t=" + now);
-                    } else {
-                        var errText = xhr.responseText || "unknown error";
-                        // 打印 COS 返回的详细错误信息
-                        try { var parser = new DOMParser(); var xmlDoc = parser.parseFromString(errText, "text/xml"); var code = xmlDoc.getElementsByTagName("Code")[0]; var msg = xmlDoc.getElementsByTagName("Message")[0]; console.error("COS错误:", code ? code.textContent : "?", msg ? msg.textContent : "?"); } catch(e) { console.error("COS错误 (raw):", errText.slice(0, 500)); }
-                        reject(new Error("HTTP " + xhr.status + ": " + errText.slice(0, 200)));
-                    }
-                };
-                xhr.onerror = function() {
-                    console.error("COS网络错误: 无法连接到服务器");
-                    reject(new Error("网络错误，请检查CORS设置"));
-                };
-                // 打印签名用于调试
-                console.log("COS Auth:", auth.slice(0, 80) + "...");
-                console.log("COS URL:", url);
-                xhr.onerror = function() {
-                    reject(new Error("网络错误，请检查CORS设置"));
-                };
-                xhr.send(file);
-            });
+        
+        // LOGGING: 打印签名过程的每个步骤
+        var ct = file.type || "application/octet-stream";
+        var m = "put";
+        var headers = "content-type=" + encodeURIComponent(ct) + "&host=" + host;
+        var hs = m + "\n" + cPath + "\n\n" + headers + "\n";
+        var hs1 = jsSHA1(hs);
+        var sts = "sha1\n" + kt + "\n" + hs1 + "\n";
+        var sk = hmacStr(cfg.secretKey, kt);
+        var sig = hmacBytes(hexToRawBytes(sk), enc(sts));
+        var auth = "q-sign-algorithm=sha1&q-ak=" + cfg.secretId +
+            "&q-sign-time=" + kt + "&q-key-time=" + kt +
+            "&q-header-list=content-type;host&q-url-param-list=&q-signature=" + sig;
+        
+        console.log("=== COS DEBUG ===");
+        console.log("URL:", url);
+        console.log("HttpString:", JSON.stringify(hs));
+        console.log("SHA1(HttpString):", hs1);
+        console.log("StringToSign:", JSON.stringify(sts));
+        console.log("SignKey:", sk);
+        console.log("Signature:", sig);
+        console.log("Authorization:", auth);
+        console.log("=================");
+        
+        return new Promise(function(resolve, reject) {
+            var xhr = new XMLHttpRequest();
+            xhr.open("PUT", url, true);
+            xhr.setRequestHeader("Authorization", auth);
+            xhr.setRequestHeader("Content-Type", ct);
+            xhr.onload = function() {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    resolve(url + "?t=" + now);
+                } else {
+                    var errText = xhr.responseText || "unknown error";
+                    try { var p = new DOMParser(); var xd = p.parseFromString(errText, "text/xml"); var code = xd.getElementsByTagName("Code")[0]; var msg = xd.getElementsByTagName("Message")[0]; console.error("COS \u9519\u8bef\u4ee3\u7801:", code ? code.textContent : "?", msg ? msg.textContent : "?"); } catch(e) {}
+                    console.error("COS \u8fd4\u56de\u539f\u59cb\u9519\u8bef:", errText.slice(0, 500));
+                    reject(new Error("HTTP " + xhr.status + ": " + errText.slice(0, 200)));
+                }
+            };
+            xhr.onerror = function() {
+                console.error("COS \u7f51\u7edc\u9519\u8bef\uff1a\u65e0\u6cd5\u8fde\u63a5\u5230\u670d\u52a1\u5668");
+                reject(new Error("\u7f51\u7edc\u9519\u8bef\uff0c\u8bf7\u68c0\u67e5CORS\u8bbe\u7f6e"));
+            };
+            xhr.send(file);
+        });
     }
     var STORAGE_KEY = "lulu_projects_data";
     var COVERS_KEY = "lulu_covers";
