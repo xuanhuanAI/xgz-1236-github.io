@@ -98,35 +98,31 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 
     // ====== COS Data Sync ======
+    var COS_BUCKET_KEY = "cos_bucket_info";
+    function saveCosBucketInfo(cfg) {
+        try { localStorage.setItem(COS_BUCKET_KEY, JSON.stringify({bucket: cfg.bucket, region: cfg.region})); } catch(e) {}
+    }
+    function loadCosBucketInfo() {
+        try { var s = localStorage.getItem(COS_BUCKET_KEY); return s ? JSON.parse(s) : null; } catch(e) { return null; }
+    }
     function getCosJson(path) {
-        var cos = initCos();
-        if (!cos) return Promise.reject(new Error("COS未配置或SDK未加载"));
-        var c = loadCos();
+        var info = loadCosBucketInfo();
+        if (!info) return Promise.reject(new Error("COS未配置"));
+        var url = "https://" + info.bucket + ".cos." + info.region + ".myqcloud.com/" + path;
         return new Promise(function(resolve, reject) {
-            cos.getObject({
-                Bucket: c.bucket,
-                Region: c.region,
-                Key: path
-            }, function(err, data) {
-                if (err) {
-                    if (err.statusCode === 404) {
-                        resolve(null);
-                    } else {
-                        reject(err);
-                    }
+            var xhr = new XMLHttpRequest();
+            xhr.open("GET", url, true);
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    try { resolve(JSON.parse(xhr.responseText)); } catch(e) { reject(new Error("JSON解析失败")); }
+                } else if (xhr.status === 404) {
+                    resolve(null);
                 } else {
-                    try {
-                        var body = data.Body;
-                        if (body instanceof Blob) {
-                            var r = new FileReader();
-                            r.onload = function() { resolve(JSON.parse(r.result)); };
-                            r.readAsText(body);
-                        } else {
-                            resolve(JSON.parse(body));
-                        }
-                    } catch(e) { reject(new Error("JSON解析失败")); }
+                    reject(new Error("HTTP " + xhr.status));
                 }
-            });
+            };
+            xhr.onerror = function() { reject(new Error("网络错误")); };
+            xhr.send();
         });
     }
 
@@ -611,12 +607,14 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
             var elSecretKey = document.getElementById("cosSecretKey");
             var elStatus = document.getElementById("cosStatus");
             if (!elBucket || !elRegion || !elSecretId || !elSecretKey) return;
-            saveCos({
+            var cfg = {
                 bucket: elBucket.value.trim(),
                 region: elRegion.value.trim(),
                 secretId: elSecretId.value.trim(),
                 secretKey: elSecretKey.value.trim()
-            });
+            };
+            saveCos(cfg);
+            saveCosBucketInfo(cfg);
             if (elStatus) elStatus.innerHTML = "配置已保存，正在同步...";
             syncProjectsToCos().then(function() {
                 if (elStatus) elStatus.innerHTML = "配置已保存，数据已同步到COS";
