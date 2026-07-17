@@ -533,7 +533,7 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
                 adminList.appendChild(item);
                 item.querySelector(".edit").addEventListener("click", function() { openForm(p); });
                 item.querySelector(".delete").addEventListener("click", function() {
-                    if (confirm("鍒犻櫎銆? + p.title + "銆嶏紵鍒犻櫎鍚庢棤娉曟仮澶嶃€?)) deleteProject(p.id);
+                    if (confirm("删除「" + p.title + "」？删除后无法恢复。")) deleteProject(p.id);
                 });
             })(all[i]);
         }
