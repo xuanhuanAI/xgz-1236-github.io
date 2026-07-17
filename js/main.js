@@ -552,28 +552,26 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
         var cosTasks = [];
 
         if (formCoverFile.files[0]) {
+            var f = formCoverFile.files[0];
             var r = new FileReader();
-            (function(f) {
+            r.onload = function(ev) { saveCover(id, ev.target.result); };
+            r.readAsDataURL(f);
+            if (canCos()) {
                 var coverKey = "covers/" + id + "_" + Date.now();
-                r.onload = function(ev) {
-                    saveCover(id, ev.target.result);
-                    if (canCos()) {
-                        cosTasks.push(
-                            upCos(f, coverKey).then(function(url) {
-                                for (var ci = 0; ci < all.length; ci++) {
-                                    if (all[ci].id === id) {
-                                        if (!all[ci].detail) all[ci].detail = {};
-                                        all[ci].detail.coverUrl = url;
-                                        saveProjects(all);
-                                        break;
-                                    }
-                                }
-                            })
-                        );
-                    }
-                };
-                r.readAsDataURL(f);
-            })(formCoverFile.files[0]);
+                cosTasks.push(
+                    upCos(f, coverKey).then(function(url) {
+                        var all2 = loadProjects();
+                        for (var ci = 0; ci < all2.length; ci++) {
+                            if (all2[ci].id === id) {
+                                if (!all2[ci].detail) all2[ci].detail = {};
+                                all2[ci].detail.coverUrl = url;
+                                saveProjects(all2);
+                                break;
+                            }
+                        }
+                    })
+                );
+            }
         }
         if (formVideoFile.files[0]) {
             (function(f) {
