@@ -185,7 +185,6 @@ document.addEventListener("DOMContentLoaded", function() {
             console.log("从COS加载项目数据失败:", err && err.message ? err.message : err);
         });
     }
- catch(e) {} }
 
     function getCover(id) { try { return (JSON.parse(localStorage.getItem(COVERS_KEY))||{})[id]; } catch(e) { return null; } }
     function saveCover(id, dataUrl) {
