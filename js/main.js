@@ -59,7 +59,9 @@ document.addEventListener("DOMContentLoaded", function() {
     }
     function getCosBaseUrl() {
         var c = loadCos();
-        return c ? "https://" + c.bucket + ".cos." + c.region + ".myqcloud.com" : null;
+        var bucket = c ? c.bucket : DEFAULT_BUCKET;
+        var region = c ? c.region : DEFAULT_REGION;
+        return "https://" + bucket + ".cos." + region + ".myqcloud.com";
     }
     function initCos() {
         var c = loadCos();
@@ -863,6 +865,11 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
                 t.oncomplete = function() { res(); };
                 t.onerror = function(e) { rej(e); };
             });
+        }).then(function() {
+            if (!canCos()) return;
+            return upCos(blob, "assets/portrait.jpg").catch(function(e) {
+                console.error("头像COS上传失败:", e);
+            });
         });
     }
     function getPortrait() {
@@ -889,11 +896,13 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
     }
 
     function loadPortrait() {
+        var cosUrl = getCosBaseUrl() + "/assets/portrait.jpg";
         getPortrait().then(function(url) {
-            if (url) {
+            var finalUrl = cosUrl || url || null;
+            if (finalUrl) {
                 var ph = document.querySelector(".about-portrait-placeholder");
                 if (ph) {
-                    ph.style.cssText = "width:180px;height:180px;border-radius:50%;background:url(" + url + ") center/cover no-repeat;overflow:hidden";
+                    ph.style.cssText = "width:180px;height:180px;border-radius:50%;background:url(" + finalUrl + ") center/cover no-repeat;overflow:hidden";
                     ph.innerHTML = "";
                 }
             }
