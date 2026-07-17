@@ -99,7 +99,7 @@ document.addEventListener("DOMContentLoaded", function() {
             { name: "HMAC", hash: "SHA-1" }, false, ["sign"]);
         var skBuf = await crypto.subtle.sign("HMAC", key1, enc.encode(keyTime));
         var sk = bufToHex(skBuf);
-        var key2 = await crypto.subtle.importKey("raw", hexToBytes(sk),
+        var key2 = await crypto.subtle.importKey("raw", enc.encode(sk),
             { name: "HMAC", hash: "SHA-1" }, false, ["sign"]);
         var sigBuf = await crypto.subtle.sign("HMAC", key2, enc.encode(sts));
         var sig = bufToHex(sigBuf);
