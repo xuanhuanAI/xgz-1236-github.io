@@ -84,6 +84,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 Region: c.region,
                 Key: key,
                 Body: file,
+                ACL: "public-read",
                 onProgress: function() {}
             }, function(err, data) {
                 if (err) {
@@ -761,6 +762,11 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
                 t.oncomplete = function() { res(); };
                 t.onerror = function(e) { rej(e); };
             });
+        }).then(function() {
+            if (!canCos()) return;
+            return upCos(blob, "assets/bg_image.jpg").catch(function(e) {
+                console.error("网站背景COS上传失败:", e);
+            });
         });
     }
     function getBgImage() {
@@ -787,9 +793,11 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
     }
 
     function loadBgImage() {
+        var cosUrl = getCosBaseUrl() ? getCosBaseUrl() + "/assets/bg_image.jpg" : null;
         getBgImage().then(function(url) {
-            if (url) {
-                document.body.style.backgroundImage = "url(" + url + ")";
+            var finalUrl = cosUrl || url || null;
+            if (finalUrl) {
+                document.body.style.backgroundImage = "url(" + finalUrl + ")";
                 document.body.style.backgroundSize = "cover";
                 document.body.style.backgroundPosition = "center";
                 document.body.style.backgroundAttachment = "fixed";
@@ -942,6 +950,11 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
                 t.oncomplete = function() { res(); };
                 t.onerror = function(e) { rej(e); };
             });
+        }).then(function() {
+            if (!canCos()) return;
+            return upCos(blob, "assets/about_bg.jpg").catch(function(e) {
+                console.error("关于背景COS上传失败:", e);
+            });
         });
     }
     function getAboutBg() {
@@ -967,11 +980,13 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
         });
     }
     function loadAboutBg() {
+        var cosUrl = getCosBaseUrl() ? getCosBaseUrl() + "/assets/about_bg.jpg" : null;
         getAboutBg().then(function(url) {
             var sec = document.getElementById("about");
             if (sec) {
-                if (url) {
-                    sec.style.background = "url(" + url + ") center/cover no-repeat fixed";
+                var finalUrl = cosUrl || url || null;
+                if (finalUrl) {
+                    sec.style.background = "url(" + finalUrl + ") center/cover no-repeat fixed";
                     sec.style.position = "relative";
                     var existing = sec.querySelector(".about-bg-overlay");
                     if (!existing) {
@@ -1038,6 +1053,11 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
                 t.oncomplete = function() { res(); };
                 t.onerror = function(e) { rej(e); };
             });
+        }).then(function() {
+            if (!canCos()) return;
+            return upCos(blob, "assets/hero_bg.jpg").catch(function(e) {
+                console.error("首屏背景COS上传失败:", e);
+            });
         });
     }
     function getHeroBg() {
@@ -1063,15 +1083,17 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
         });
     }
     function loadHeroBg() {
+        var cosUrl = getCosBaseUrl() ? getCosBaseUrl() + "/assets/hero_bg.jpg" : null;
         getHeroBg().then(function(url) {
             var heroBg = document.querySelector(".hero-bg");
             if (heroBg) {
-                if (url) {
-                    heroBg.style.background = "url(" + url + ") center/cover no-repeat";
+                // Priority: COS > local blob > gradient
+                var finalUrl = cosUrl || url || null;
+                if (finalUrl) {
+                    heroBg.style.background = "url(" + finalUrl + ") center/cover no-repeat";
                     heroBg.style.position = "absolute";
                     heroBg.style.inset = "0";
                     heroBg.style.zIndex = "0";
-                    // Clear the pseudo-element light effects by adding dark overlay
                     var existing = heroBg.parentNode.querySelector(".hero-bg-overlay");
                     if (!existing) {
                         var ov = document.createElement("div");
