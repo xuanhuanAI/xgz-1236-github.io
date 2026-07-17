@@ -105,10 +105,13 @@ document.addEventListener("DOMContentLoaded", function() {
     function loadCosBucketInfo() {
         try { var s = localStorage.getItem(COS_BUCKET_KEY); return s ? JSON.parse(s) : null; } catch(e) { return null; }
     }
+    var DEFAULT_BUCKET = "qaz123456-1454067625";
+    var DEFAULT_REGION = "ap-beijing";
     function getCosJson(path) {
         var info = loadCosBucketInfo();
-        if (!info) return Promise.reject(new Error("COS未配置"));
-        var url = "https://" + info.bucket + ".cos." + info.region + ".myqcloud.com/" + path;
+        var bucket = info ? info.bucket : DEFAULT_BUCKET;
+        var region = info ? info.region : DEFAULT_REGION;
+        var url = "https://" + bucket + ".cos." + region + ".myqcloud.com/" + path;
         return new Promise(function(resolve, reject) {
             var xhr = new XMLHttpRequest();
             xhr.open("GET", url, true);
@@ -648,20 +651,27 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
             elStatus.innerHTML = "正在测试连接...";
             elStatus.style.color = "";
             cosTestBtn.disabled = true;
-            var testCos = new COS({ SecretId: secretId, SecretKey: secretKey });
-            testCos.getService({}, function(err, data) {
+            var host = bucket + ".cos." + region + ".myqcloud.com";
+            var url = "https://" + host + "/?t=" + Date.now();
+            cosTestBtn.disabled = true;
+            var xhr = new XMLHttpRequest();
+            xhr.open("GET", url, true);
+            xhr.onload = function() {
                 cosTestBtn.disabled = false;
-                if (err) {
-                    var code = err.code || err.Error && err.Error.Code || "未知";
-                    var msg = err.message || err.Error && err.Error.Message || "";
-                    elStatus.innerHTML = "连接失败: " + code + " - " + msg;
-                    elStatus.style.color = "#ff6b6b";
-                    console.error("COS SDK测试失败:", err);
-                } else {
-                    elStatus.innerHTML = "连接成功! SDK可正常工作";
+                if (xhr.status === 403 || xhr.status === 200 || xhr.status === 404) {
+                    elStatus.innerHTML = "存储桶可达 (HTTP " + xhr.status + ") - 若为403可能是密钥问题";
                     elStatus.style.color = "#4caf50";
+                } else {
+                    elStatus.innerHTML = "HTTP " + xhr.status;
+                    elStatus.style.color = "#ff6b6b";
                 }
-            });
+            };
+            xhr.onerror = function() {
+                cosTestBtn.disabled = false;
+                elStatus.innerHTML = "无法连接 - 请在COS控制台设置CORS允许 https://xuanhuanai.github.io";
+                elStatus.style.color = "#ff6b6b";
+            };
+            xhr.send();
         });
     }
 
