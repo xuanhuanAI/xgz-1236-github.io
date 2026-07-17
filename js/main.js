@@ -1,4 +1,4 @@
-﻿// ============================================
+// ============================================
 // 浠欎緺鐜勫够AI - Main JavaScript
 // ============================================
 
@@ -233,8 +233,8 @@ document.addEventListener("DOMContentLoaded", function() {
 
     var typeLabels = {
         "short-drama": "AI鐭墽",
-        "commercial": "AI骞垮憡鐗?,
-        "micro-film": "AI寰數褰?,
+        "commercial": "AI骞垮憡鐗?",
+        "micro-film": "AI寰數褰?",
         "comic": "AI婕墽",
         "brand": "鍝佺墝瑙嗚"
     };
@@ -402,7 +402,7 @@ document.addEventListener("DOMContentLoaded", function() {
             var delBtn = document.getElementById("deleteVideoBtn");
             if (delBtn) {
                 delBtn.addEventListener("click", function() {
-                    if (confirm("纭畾鍒犻櫎姝ら」鐩殑瑙嗛锛?)) {
+                    if (confirm("纭畾鍒犻櫎姝ら」鐩殑瑙嗛锛?")) {
                         deleteVideoDB(project.id).then(function() { openModal(project); });
                     }
                 });
@@ -788,7 +788,7 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
     var bgUploadBtn = document.createElement("button");
     bgUploadBtn.className = "btn btn-outline";
     bgUploadBtn.style.cssText = "width:100%;padding:10px 20px;font-size:13px;margin-top:10px";
-    bgUploadBtn.textContent = "馃柤 鏇存崲缃戠珯鑳屾櫙鍥?;
+    bgUploadBtn.textContent = "馃柤 鏇存崲缃戠珯鑳屾櫙鍥?";
     tb.appendChild(bgUploadBtn);
 
     bgUploadBtn.addEventListener("click", function() {
@@ -802,7 +802,7 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
             saveBgImage(inp.files[0]).then(function() {
                 document.body.removeChild(inp);
                 loadBgImage();
-                alert("鑳屾櫙鍥惧凡鏇存柊锛?);
+                alert("鑳屾櫙鍥惧凡鏇存柊锛?");
             }).catch(function(err) { console.error("COS涓婁紶澶辫触:", err && err.message ? err.message : err);
                 alert("涓婁紶澶辫触锛岃閲嶈瘯");
             });
@@ -820,7 +820,7 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
             document.body.style.backgroundImage = "";
             var ov = document.getElementById("bgOverlay");
             if (ov) ov.remove();
-            alert("宸叉仮澶嶉粯璁ら粦鑹茶儗鏅?);
+            alert("宸叉仮澶嶉粯璁ら粦鑹茶儗鏅?");
         });
     });
 
@@ -919,7 +919,7 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
                 ph.style.cssText = "";
                 ph.innerHTML = "<span class=\"about-badge\" style=\"display:inline-flex;align-items:center;justify-content:center;width:80px;height:80px;font-size:28px;font-weight:700;letter-spacing:2px;color:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.08);border-radius:50%\">AI</span>";
             }
-            alert("澶村儚宸插垹闄?);
+            alert("澶村儚宸插垹闄?");
         });
     });
 
@@ -1023,7 +1023,7 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
             saveAboutBg(inp.files[0]).then(function() {
                 document.body.removeChild(inp);
                 loadAboutBg();
-                alert("鑳屾櫙鍥惧凡鏇存柊锛?);
+                alert("鑳屾櫙鍥惧凡鏇存柊锛?");
             }).catch(function(err) { console.error("COS涓婁紶澶辫触:", err && err.message ? err.message : err); alert("涓婁紶澶辫触"); });
         });
     });
@@ -1031,13 +1031,13 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
     var abDelBtn = document.createElement("button");
     abDelBtn.className = "btn btn-outline";
     abDelBtn.style.cssText = "width:100%;padding:10px 20px;font-size:13px;margin-top:6px;color:#ff6b6b;border-color:rgba(255,68,68,0.2)";
-    abDelBtn.textContent = "鉁?鎭㈠銆岃瑙夊垱浣滆€呫€嶉粯璁よ儗鏅?;
+    abDelBtn.textContent = "鉁?鎭㈠銆岃瑙夊垱浣滆€呫€嶉粯璁よ儗鏅?";
     tb.appendChild(abDelBtn);
 
     abDelBtn.addEventListener("click", function() {
         removeAboutBg().then(function() {
             loadAboutBg();
-            alert("宸叉仮澶嶉粯璁?);
+            alert("宸叉仮澶嶉粯璁?");
         });
     });
 
@@ -1135,7 +1135,7 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
     var heroBtn = document.createElement("button");
     heroBtn.className = "btn btn-outline";
     heroBtn.style.cssText = "width:100%;padding:10px 20px;font-size:13px;margin-top:10px";
-    heroBtn.textContent = "馃柤 涓婁紶棣栭〉棣栧睆鑳屾櫙鍥?;
+    heroBtn.textContent = "馃柤 涓婁紶棣栭〉棣栧睆鑳屾櫙鍥?";
     tb.appendChild(heroBtn);
 
     heroBtn.addEventListener("click", function() {
@@ -1163,7 +1163,7 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
     heroDelBtn.addEventListener("click", function() {
         removeHeroBg().then(function() {
             loadHeroBg();
-            alert("宸叉仮澶嶉粯璁?);
+            alert("宸叉仮澶嶉粯璁?");
         });
     });
 
@@ -1312,9 +1312,9 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
     // ---------- Service Item Clicks (scroll to work + filter) ----------
     var serviceMap = {
         "AI鐭墽": "short-drama",
-        "AI寰數褰?: "micro-film",
+        "AI寰數褰?": "micro-film",
         "鍝佺墝瑙嗚": "brand",
-        "AI宸ヤ綔娴?: "all"
+        "AI宸ヤ綔娴?": "all"
     };
     var serviceItems = document.querySelectorAll(".service-item");
     for (var i = 0; i < serviceItems.length; i++) {
