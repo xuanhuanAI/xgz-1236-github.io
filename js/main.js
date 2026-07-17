@@ -227,7 +227,9 @@ document.addEventListener("DOMContentLoaded", function() {
 
                 var colors = project.colors || ["#1a1a1a","#2a2a2a"];
                 var gradient = "linear-gradient(135deg," + colors[0] + "," + colors[1] + ")";
-                var cover = getCover(project.id);
+                var cosCover = project.detail && project.detail.coverUrl;
+                var localCover = getCover(project.id);
+                var cover = cosCover || localCover || "";
                 var bgStyle = cover ? "background:url(\x27" + cover + "\x27) center/cover no-repeat" : "background:" + gradient;
 
                 card.innerHTML =
@@ -259,7 +261,9 @@ document.addEventListener("DOMContentLoaded", function() {
 
         var colors = project.colors || ["#1a1a1a","#2a2a2a"];
         var posterGrad = "linear-gradient(135deg," + colors[0] + "," + colors[1] + ")";
-        var cover = getCover(project.id);
+        var cosCover2 = project.detail && project.detail.coverUrl;
+        var localCover2 = getCover(project.id);
+        var cover = cosCover2 || localCover2 || "";
         var posterStyle = cover ? "background:url(\x27" + cover + "\x27) center/cover no-repeat" : "background:" + posterGrad;
 
         modalContent.innerHTML =
@@ -278,7 +282,11 @@ document.addEventListener("DOMContentLoaded", function() {
         var mediaDiv = modalContent.querySelector(".modal-media");
 
         // ---- Handle video + cover buttons ----
-        getVideoDB(project.id).then(function(videoUrl) {
+        var cosVideo = detail && detail.videoUrl;
+        if (cosVideo) {
+            mediaDiv.innerHTML = "<video class=\"modal-video\" src=\"" + cosVideo + "\" controls preload=\"metadata\" playsinline style=\"width:100%;display:block;background:#1a1a1a;max-height:500px;border-radius:14px\"></video>";
+        } else {
+            getVideoDB(project.id).then(function(videoUrl) {
             if (videoUrl) {
                 mediaDiv.innerHTML = "<video class=\"modal-video\" src=\"" + videoUrl + "\" controls preload=\"metadata\" playsinline style=\"width:100%;display:block;background:#1a1a1a;max-height:500px;border-radius:14px\"></video>";
             } else if (detail.video) {
@@ -329,7 +337,8 @@ document.addEventListener("DOMContentLoaded", function() {
                     }
                 });
             }
-        });
+            });
+        }
 
         document.body.style.overflow = "hidden";
         modal.classList.add("open");
@@ -540,19 +549,64 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
 
         saveProjects(all);
 
+        var cosTasks = [];
+
         if (formCoverFile.files[0]) {
             var r = new FileReader();
-            r.onload = function(ev) { saveCover(id, ev.target.result); };
-            r.readAsDataURL(formCoverFile.files[0]);
+            (function(f) {
+                var coverKey = "covers/" + id + "_" + Date.now();
+                r.onload = function(ev) {
+                    saveCover(id, ev.target.result);
+                    if (canCos()) {
+                        cosTasks.push(
+                            upCos(f, coverKey).then(function(url) {
+                                for (var ci = 0; ci < all.length; ci++) {
+                                    if (all[ci].id === id) {
+                                        if (!all[ci].detail) all[ci].detail = {};
+                                        all[ci].detail.coverUrl = url;
+                                        saveProjects(all);
+                                        break;
+                                    }
+                                }
+                            })
+                        );
+                    }
+                };
+                r.readAsDataURL(f);
+            })(formCoverFile.files[0]);
         }
         if (formVideoFile.files[0]) {
-            saveVideoDB(id, formVideoFile.files[0]);
+            (function(f) {
+                var videoKey = "videos/" + id + "_" + Date.now();
+                saveVideoDB(id, f);
+                if (canCos()) {
+                    cosTasks.push(
+                        upCos(f, videoKey).then(function(url) {
+                            for (var vi = 0; vi < all.length; vi++) {
+                                if (all[vi].id === id) {
+                                    if (!all[vi].detail) all[vi].detail = {};
+                                    all[vi].detail.videoUrl = url;
+                                    saveProjects(all);
+                                    break;
+                                }
+                            }
+                        })
+                    );
+                }
+            })(formVideoFile.files[0]);
         }
 
-        if (canCos()) {
-            syncProjectsToCos().catch(function(err) {
-                console.error("自动同步到COS失败:", err && err.message ? err.message : err);
-            });
+        var doSync = function() {
+            if (canCos()) {
+                syncProjectsToCos().catch(function(err) {
+                    console.error("自动同步到COS失败:", err && err.message ? err.message : err);
+                });
+            }
+        };
+        if (cosTasks.length > 0) {
+            Promise.all(cosTasks).then(doSync);
+        } else {
+            doSync();
         }
         formModal.classList.remove("open");
         renderAdminList();
