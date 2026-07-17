@@ -1,5 +1,5 @@
-// ============================================
-// 仙侠玄幻AI - Main JavaScript
+﻿// ============================================
+// 浠欎緺鐜勫够AI - Main JavaScript
 // ============================================
 
 document.addEventListener("DOMContentLoaded", function() {
@@ -19,7 +19,7 @@ document.addEventListener("DOMContentLoaded", function() {
         var c = loadCos();
         return c ? "https://" + c.bucket + ".cos." + c.region + ".myqcloud.com" : null;
     }
-    // Web Crypto API COS 直连上传
+    // Web Crypto API COS 鐩磋繛涓婁紶
     function hexBuf(buf) {
         return Array.from(new Uint8Array(buf)).map(function(b) {
             return b.toString(16).padStart(2, "0");
@@ -111,8 +111,7 @@ document.addEventListener("DOMContentLoaded", function() {
         var now = Math.floor(Date.now() / 1000);
         var kt = now + ";" + (now + 86400);
         
-        // LOGGING: 打印签名过程的每个步骤
-        var ct = file.type || "application/octet-stream";
+        // LOGGING: 鎵撳嵃绛惧悕杩囩▼鐨勬瘡涓楠?        var ct = file.type || "application/octet-stream";
         var m = "put";
         var headers = "content-type=" + encodeURIComponent(ct) + "&host=" + host;
         var hs = m + "\n" + cPath + "\n\n" + headers + "\n";
@@ -156,6 +155,58 @@ document.addEventListener("DOMContentLoaded", function() {
             xhr.send(file);
         });
     }
+    // ====== COS: GET JSON (read projects.json from COS) ======
+    function getCosJson(path) {
+        var cfg = loadCos();
+        if (!cfg) return Promise.reject(new Error("COS未配置"));
+        var url = "https://" + cfg.bucket + ".cos." + cfg.region + ".myqcloud.com/" + path;
+        return new Promise(function(resolve, reject) {
+            var xhr = new XMLHttpRequest();
+            xhr.open("GET", url, true);
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    try { resolve(JSON.parse(xhr.responseText)); } catch(e) { reject(new Error("JSON解析失败")); }
+                } else if (xhr.status === 404) {
+                    resolve(null);
+                } else {
+                    reject(new Error("HTTP " + xhr.status));
+                }
+            };
+            xhr.onerror = function() { reject(new Error("网络错误")); };
+            xhr.send();
+        });
+    }
+
+    // ====== COS: PUT JSON (sync projects data to COS) ======
+    function syncProjectsToCos() {
+        var cfg = loadCos();
+        if (!cfg) return Promise.reject(new Error("COS未配置"));
+        var data = loadProjects();
+        var jsonStr = JSON.stringify(data, null, 2);
+        var blob = new Blob([jsonStr], { type: "application/json" });
+        var key = "site/projects.json";
+        return upCos(blob, key).then(function(url) {
+            console.log("项目数据已同步到COS:", url);
+            try { localStorage.setItem("cos_projects_synced", Date.now().toString()); } catch(e) {}
+            return url;
+        });
+    }
+
+    // ====== COS: Load projects from COS on startup ======
+    function loadProjectsFromCos() {
+        getCosJson("site/projects.json").then(function(data) {
+            if (data && Array.isArray(data) && data.length > 0) {
+                saveProjects(data);
+                var active = document.querySelector(".filter-btn.active");
+                renderProjects(active ? active.getAttribute("data-filter") : "all");
+                renderAdminList();
+                console.log("已从COS加载项目数据，共" + data.length + "个项目");
+            }
+        }).catch(function(err) {
+            console.log("从COS加载项目数据失败:", err && err.message ? err.message : err);
+        });
+    }
+
     var STORAGE_KEY = "lulu_projects_data";
     var COVERS_KEY = "lulu_covers";
     var DB_NAME = "LuluStudioDB";
@@ -181,11 +232,11 @@ document.addEventListener("DOMContentLoaded", function() {
     var currentUploadProjectId = null;
 
     var typeLabels = {
-        "short-drama": "AI短剧",
-        "commercial": "AI广告片",
-        "micro-film": "AI微电影",
-        "comic": "AI漫剧",
-        "brand": "品牌视觉"
+        "short-drama": "AI鐭墽",
+        "commercial": "AI骞垮憡鐗?,
+        "micro-film": "AI寰數褰?,
+        "comic": "AI婕墽",
+        "brand": "鍝佺墝瑙嗚"
     };
 
     // ---------- Data ----------
@@ -204,7 +255,7 @@ document.addEventListener("DOMContentLoaded", function() {
             var c = JSON.parse(localStorage.getItem(COVERS_KEY)) || {};
             c[id] = dataUrl;
             localStorage.setItem(COVERS_KEY, JSON.stringify(c));
-        } catch(e) { alert("封面图片太大，建议压缩后上传"); }
+        } catch(e) { alert("灏侀潰鍥剧墖澶ぇ锛屽缓璁帇缂╁悗涓婁紶"); }
     }
     function deleteCover(id) {
         try { var c = JSON.parse(localStorage.getItem(COVERS_KEY))||{}; delete c[id]; localStorage.setItem(COVERS_KEY,JSON.stringify(c)); } catch(e) {}
@@ -280,7 +331,7 @@ document.addEventListener("DOMContentLoaded", function() {
                         "<h3 class=\"work-card-title\">" + project.title + "</h3>" +
                         "<p class=\"work-card-highlight\">" + project.highlight + "</p>" +
                     "</div>" +
-                    "<div class=\"work-card-hover\"><span>查看项目</span><span class=\"arrow\">→</span></div>";
+                    "<div class=\"work-card-hover\"><span>鏌ョ湅椤圭洰</span><span class=\"arrow\">鈫?/span></div>";
 
                 card.addEventListener("click", function() { openModal(project); });
                 workGrid.appendChild(card);
@@ -311,7 +362,7 @@ document.addEventListener("DOMContentLoaded", function() {
             "</div>" +
             "<div class=\"modal-media\" style=\"" + posterStyle + ";min-height:260px\">" +
                 "<div class=\"modal-media-placeholder\" style=\"display:flex;align-items:center;justify-content:center;height:260px\">" +
-                    "<span style=\"font-size:48px;opacity:0.2\">🎬</span>" +
+                    "<span style=\"font-size:48px;opacity:0.2\">馃幀</span>" +
                 "</div>" +
             "</div>" +
             (detail.subtitle ? "<p class=\"modal-subtitle\">" + detail.subtitle + "</p>" : "") +
@@ -320,14 +371,14 @@ document.addEventListener("DOMContentLoaded", function() {
         var mediaDiv = modalContent.querySelector(".modal-media");
 
                 // ---- Handle video + cover buttons ----
-        // 视频优先级: detail.videoUrl > IndexedDB上传 > detail.video > 上传按钮
+        // 瑙嗛浼樺厛绾? detail.videoUrl > IndexedDB涓婁紶 > detail.video > 涓婁紶鎸夐挳
         function renderVideoActions(hasVideo_local) {
             var actionsDiv = document.createElement("div");
             actionsDiv.style.cssText = "margin-top:20px;display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap";
             var hasV = !!(detail.videoUrl || hasVideo_local || detail.video);
             actionsDiv.innerHTML =
-                "<button class=\"btn-upload-video\" id=\"changeCoverBtn\" style=\"font-size:12px;padding:8px 20px\">🖼 更换封面</button>" +
-                (hasV ? "<button class=\"btn-upload-video\" id=\"deleteVideoBtn\" style=\"font-size:12px;padding:8px 20px;color:#ff6b6b;border-color:rgba(255,68,68,0.2)\">🗑 删除视频</button>" : "");
+                "<button class=\"btn-upload-video\" id=\"changeCoverBtn\" style=\"font-size:12px;padding:8px 20px\">馃柤 鏇存崲灏侀潰</button>" +
+                (hasV ? "<button class=\"btn-upload-video\" id=\"deleteVideoBtn\" style=\"font-size:12px;padding:8px 20px;color:#ff6b6b;border-color:rgba(255,68,68,0.2)\">馃棏 鍒犻櫎瑙嗛</button>" : "");
             modalContent.appendChild(actionsDiv);
 
             document.getElementById("changeCoverBtn").addEventListener("click", function() {
@@ -351,7 +402,7 @@ document.addEventListener("DOMContentLoaded", function() {
             var delBtn = document.getElementById("deleteVideoBtn");
             if (delBtn) {
                 delBtn.addEventListener("click", function() {
-                    if (confirm("确定删除此项目的视频？")) {
+                    if (confirm("纭畾鍒犻櫎姝ら」鐩殑瑙嗛锛?)) {
                         deleteVideoDB(project.id).then(function() { openModal(project); });
                     }
                 });
@@ -370,7 +421,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 } else {
                     var uploadDiv = document.createElement("div");
                     uploadDiv.className = "modal-video-upload";
-                    uploadDiv.innerHTML = "<button class=\"btn-upload-video\">上传视频到此项目</button>";
+                    uploadDiv.innerHTML = "<button class=\"btn-upload-video\">涓婁紶瑙嗛鍒版椤圭洰</button>";
                     mediaDiv.appendChild(uploadDiv);
                     uploadDiv.querySelector("button").addEventListener("click", function() {
                         currentUploadProjectId = project.id;
@@ -394,7 +445,7 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
             if (!file || !currentUploadProjectId) return;
             saveVideoDB(currentUploadProjectId, file).then(function() {
                 closeModal();
-                alert("视频上传成功");
+                alert("瑙嗛涓婁紶鎴愬姛");
             });
         });
     }
@@ -476,13 +527,13 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
                         "<span class=\"admin-item-type\">" + p.typeLabel + "</span>" +
                     "</div>" +
                     "<div class=\"admin-item-actions\">" +
-                        "<button class=\"admin-btn edit\">编辑</button>" +
-                        "<button class=\"admin-btn delete\">删除</button>" +
+                        "<button class=\"admin-btn edit\">缂栬緫</button>" +
+                        "<button class=\"admin-btn delete\">鍒犻櫎</button>" +
                     "</div>";
                 adminList.appendChild(item);
                 item.querySelector(".edit").addEventListener("click", function() { openForm(p); });
                 item.querySelector(".delete").addEventListener("click", function() {
-                    if (confirm("删除「" + p.title + "」？删除后无法恢复。")) deleteProject(p.id);
+                    if (confirm("鍒犻櫎銆? + p.title + "銆嶏紵鍒犻櫎鍚庢棤娉曟仮澶嶃€?)) deleteProject(p.id);
                 });
             })(all[i]);
         }
@@ -497,6 +548,12 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
         deleteCover(id);
         deleteVideoDB(id);
         renderAdminList();
+        // 删除后同步到COS
+        if (canCos()) {
+            syncProjectsToCos().catch(function(err) {
+                console.error("删除后同步COS失败:", err && err.message ? err.message : err);
+            });
+        }
         var active = document.querySelector(".filter-btn.active");
         renderProjects(active ? active.getAttribute("data-filter") : "all");
     }
@@ -582,7 +639,7 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
                         if (all[j].id === id) { all[j].coverUrl = url; break; }
                     }
                     saveProjects(all);
-                }).catch(function(err) { console.error("COS上传失败:", err && err.message ? err.message : err);
+                }).catch(function(err) { console.error("COS涓婁紶澶辫触:", err && err.message ? err.message : err);
                     var r = new FileReader();
                     r.onload = function(ev) { saveCover(id, ev.target.result); };
                     r.readAsDataURL(cf);
@@ -608,7 +665,7 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
                         }
                     }
                     saveProjects(all);
-                }).catch(function(err) { console.error("COS上传失败:", err && err.message ? err.message : err);
+                }).catch(function(err) { console.error("COS涓婁紶澶辫触:", err && err.message ? err.message : err);
                     saveVideoDB(id, vf);
                 });
             } else {
@@ -616,6 +673,18 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
             }
         }
 
+        // 如果配置了COS，自动同步项目数据
+        if (canCos()) {
+            syncProjectsToCos().catch(function(err) {
+                console.error("自动同步到COS失败:", err && err.message ? err.message : err);
+            });
+        }
+        // 如果配置了COS，自动同步项目数据
+        if (canCos()) {
+            syncProjectsToCos().catch(function(err) {
+                console.error("自动同步到COS失败:", err && err.message ? err.message : err);
+            });
+        }
         formModal.classList.remove("open");
         renderAdminList();
         var active = document.querySelector(".filter-btn.active");
@@ -633,6 +702,8 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
     // ---------- Init ----------
     renderProjects("all");
     initScrollReveal();
+    // 尝试从COS加载已同步的项目数据（覆盖本地默认数据）
+    setTimeout(function() { loadProjectsFromCos(); }, 500);
     // ---------- Background Image (IndexedDB - no size limit) ----------
     function saveBgImage(blob) {
         var file = blob;
@@ -640,7 +711,7 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
             var key = "site/bg_" + Date.now() + ".jpg";
             return upCos(file, key).then(function(url) {
                 try { localStorage.setItem("cos_bg_url", url); } catch(e) {}
-            }).catch(function(err) { console.error("COS上传失败:", err && err.message ? err.message : err);
+            }).catch(function(err) { console.error("COS涓婁紶澶辫触:", err && err.message ? err.message : err);
                 return saveBgToDB(blob);
             });
         }
@@ -717,7 +788,7 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
     var bgUploadBtn = document.createElement("button");
     bgUploadBtn.className = "btn btn-outline";
     bgUploadBtn.style.cssText = "width:100%;padding:10px 20px;font-size:13px;margin-top:10px";
-    bgUploadBtn.textContent = "🖼 更换网站背景图";
+    bgUploadBtn.textContent = "馃柤 鏇存崲缃戠珯鑳屾櫙鍥?;
     tb.appendChild(bgUploadBtn);
 
     bgUploadBtn.addEventListener("click", function() {
@@ -731,9 +802,9 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
             saveBgImage(inp.files[0]).then(function() {
                 document.body.removeChild(inp);
                 loadBgImage();
-                alert("背景图已更新！");
-            }).catch(function(err) { console.error("COS上传失败:", err && err.message ? err.message : err);
-                alert("上传失败，请重试");
+                alert("鑳屾櫙鍥惧凡鏇存柊锛?);
+            }).catch(function(err) { console.error("COS涓婁紶澶辫触:", err && err.message ? err.message : err);
+                alert("涓婁紶澶辫触锛岃閲嶈瘯");
             });
         });
     });
@@ -741,7 +812,7 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
     var bgRemoveBtn = document.createElement("button");
     bgRemoveBtn.className = "btn btn-outline";
     bgRemoveBtn.style.cssText = "width:100%;padding:10px 20px;font-size:13px;margin-top:6px;color:#ff6b6b;border-color:rgba(255,68,68,0.2)";
-    bgRemoveBtn.textContent = "✕ 恢复默认黑色背景";
+    bgRemoveBtn.textContent = "鉁?鎭㈠榛樿榛戣壊鑳屾櫙";
     tb.appendChild(bgRemoveBtn);
 
     bgRemoveBtn.addEventListener("click", function() {
@@ -749,7 +820,7 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
             document.body.style.backgroundImage = "";
             var ov = document.getElementById("bgOverlay");
             if (ov) ov.remove();
-            alert("已恢复默认黑色背景");
+            alert("宸叉仮澶嶉粯璁ら粦鑹茶儗鏅?);
         });
     });
 
@@ -761,7 +832,7 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
             var key = "site/portrait_" + Date.now() + ".jpg";
             return upCos(file, key).then(function(url) {
                 try { localStorage.setItem("cos_portrait_url", url); } catch(e) {}
-            }).catch(function(err) { console.error("COS上传失败:", err && err.message ? err.message : err);
+            }).catch(function(err) { console.error("COS涓婁紶澶辫触:", err && err.message ? err.message : err);
                 return saveToDB(blob, "portrait");
             });
         }
@@ -816,7 +887,7 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
     var ptBtn = document.createElement("button");
     ptBtn.className = "btn btn-outline";
     ptBtn.style.cssText = "width:100%;padding:10px 20px;font-size:13px;margin-top:10px";
-    ptBtn.textContent = "🖼 上传个人头像";
+    ptBtn.textContent = "馃柤 涓婁紶涓汉澶村儚";
     tb.appendChild(ptBtn);
 
     ptBtn.addEventListener("click", function() {
@@ -830,15 +901,15 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
             savePortrait(inp.files[0]).then(function() {
                 document.body.removeChild(inp);
                 loadPortrait();
-                alert("头像已更新！");
-            }).catch(function(err) { console.error("COS上传失败:", err && err.message ? err.message : err); alert("上传失败"); });
+                alert("澶村儚宸叉洿鏂帮紒");
+            }).catch(function(err) { console.error("COS涓婁紶澶辫触:", err && err.message ? err.message : err); alert("涓婁紶澶辫触"); });
         });
     });
 
     var ptDelBtn = document.createElement("button");
     ptDelBtn.className = "btn btn-outline";
     ptDelBtn.style.cssText = "width:100%;padding:10px 20px;font-size:13px;margin-top:6px;color:#ff6b6b;border-color:rgba(255,68,68,0.2)";
-    ptDelBtn.textContent = "✕ 删除个人头像";
+    ptDelBtn.textContent = "鉁?鍒犻櫎涓汉澶村儚";
     tb.appendChild(ptDelBtn);
 
     ptDelBtn.addEventListener("click", function() {
@@ -848,7 +919,7 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
                 ph.style.cssText = "";
                 ph.innerHTML = "<span class=\"about-badge\" style=\"display:inline-flex;align-items:center;justify-content:center;width:80px;height:80px;font-size:28px;font-weight:700;letter-spacing:2px;color:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.08);border-radius:50%\">AI</span>";
             }
-            alert("头像已删除");
+            alert("澶村儚宸插垹闄?);
         });
     });
 
@@ -860,7 +931,7 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
             var key = "site/about_" + Date.now() + ".jpg";
             return upCos(file, key).then(function(url) {
                 try { localStorage.setItem("cos_about_url", url); } catch(e) {}
-            }).catch(function(err) { console.error("COS上传失败:", err && err.message ? err.message : err);
+            }).catch(function(err) { console.error("COS涓婁紶澶辫触:", err && err.message ? err.message : err);
                 return saveToDB(blob, "about_bg");
             });
         }
@@ -938,7 +1009,7 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
     var abBtn = document.createElement("button");
     abBtn.className = "btn btn-outline";
     abBtn.style.cssText = "width:100%;padding:10px 20px;font-size:13px;margin-top:10px";
-    abBtn.textContent = "🖼 上传「视觉创作者」背景图";
+    abBtn.textContent = "馃柤 涓婁紶銆岃瑙夊垱浣滆€呫€嶈儗鏅浘";
     tb.appendChild(abBtn);
 
     abBtn.addEventListener("click", function() {
@@ -952,21 +1023,21 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
             saveAboutBg(inp.files[0]).then(function() {
                 document.body.removeChild(inp);
                 loadAboutBg();
-                alert("背景图已更新！");
-            }).catch(function(err) { console.error("COS上传失败:", err && err.message ? err.message : err); alert("上传失败"); });
+                alert("鑳屾櫙鍥惧凡鏇存柊锛?);
+            }).catch(function(err) { console.error("COS涓婁紶澶辫触:", err && err.message ? err.message : err); alert("涓婁紶澶辫触"); });
         });
     });
 
     var abDelBtn = document.createElement("button");
     abDelBtn.className = "btn btn-outline";
     abDelBtn.style.cssText = "width:100%;padding:10px 20px;font-size:13px;margin-top:6px;color:#ff6b6b;border-color:rgba(255,68,68,0.2)";
-    abDelBtn.textContent = "✕ 恢复「视觉创作者」默认背景";
+    abDelBtn.textContent = "鉁?鎭㈠銆岃瑙夊垱浣滆€呫€嶉粯璁よ儗鏅?;
     tb.appendChild(abDelBtn);
 
     abDelBtn.addEventListener("click", function() {
         removeAboutBg().then(function() {
             loadAboutBg();
-            alert("已恢复默认");
+            alert("宸叉仮澶嶉粯璁?);
         });
     });
 
@@ -978,7 +1049,7 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
             var key = "site/hero_" + Date.now() + ".jpg";
             return upCos(file, key).then(function(url) {
                 try { localStorage.setItem("cos_hero_url", url); } catch(e) {}
-            }).catch(function(err) { console.error("COS上传失败:", err && err.message ? err.message : err);
+            }).catch(function(err) { console.error("COS涓婁紶澶辫触:", err && err.message ? err.message : err);
                 return saveToDB(blob, "hero_bg");
             });
         }
@@ -1064,7 +1135,7 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
     var heroBtn = document.createElement("button");
     heroBtn.className = "btn btn-outline";
     heroBtn.style.cssText = "width:100%;padding:10px 20px;font-size:13px;margin-top:10px";
-    heroBtn.textContent = "🖼 上传首页首屏背景图";
+    heroBtn.textContent = "馃柤 涓婁紶棣栭〉棣栧睆鑳屾櫙鍥?;
     tb.appendChild(heroBtn);
 
     heroBtn.addEventListener("click", function() {
@@ -1078,28 +1149,28 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
             saveHeroBg(inp.files[0]).then(function() {
                 document.body.removeChild(inp);
                 loadHeroBg();
-                alert("首页背景已更新！");
-            }).catch(function(err) { console.error("COS上传失败:", err && err.message ? err.message : err); alert("上传失败"); });
+                alert("棣栭〉鑳屾櫙宸叉洿鏂帮紒");
+            }).catch(function(err) { console.error("COS涓婁紶澶辫触:", err && err.message ? err.message : err); alert("涓婁紶澶辫触"); });
         });
     });
 
     var heroDelBtn = document.createElement("button");
     heroDelBtn.className = "btn btn-outline";
     heroDelBtn.style.cssText = "width:100%;padding:10px 20px;font-size:13px;margin-top:6px;color:#ff6b6b;border-color:rgba(255,68,68,0.2)";
-    heroDelBtn.textContent = "✕ 恢复首页默认效果";
+    heroDelBtn.textContent = "鉁?鎭㈠棣栭〉榛樿鏁堟灉";
     tb.appendChild(heroDelBtn);
 
     heroDelBtn.addEventListener("click", function() {
         removeHeroBg().then(function() {
             loadHeroBg();
-            alert("已恢复默认");
+            alert("宸叉仮澶嶉粯璁?);
         });
     });
 
     
     // ---------- COS Config Auto-load ----------
     // (toggle handled by native <details>)
-    // COS 配置面板展开/收起
+    // COS 閰嶇疆闈㈡澘灞曞紑/鏀惰捣
     var cosToggleBtn = document.getElementById("cosToggleBtn");
     if (cosToggleBtn) {
         cosToggleBtn.addEventListener("click", function() {
@@ -1125,12 +1196,125 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
             }
         });
     }
+    // ====== COS 配置保存按钮 ======
+    var cosSaveBtn = document.getElementById("cosSaveBtn");
+    if (cosSaveBtn) {
+        cosSaveBtn.addEventListener("click", function() {
+            var elBucket = document.getElementById("cosBucket");
+            var elRegion = document.getElementById("cosRegion");
+            var elSecretId = document.getElementById("cosSecretId");
+            var elSecretKey = document.getElementById("cosSecretKey");
+            var elStatus = document.getElementById("cosStatus");
+            if (!elBucket || !elRegion || !elSecretId || !elSecretKey) return;
+            var bucket = elBucket.value.trim();
+            var region = elRegion.value.trim();
+            var secretId = elSecretId.value.trim();
+            var secretKey = elSecretKey.value.trim();
+            if (!bucket || !region || !secretId || !secretKey) {
+                if (elStatus) elStatus.innerHTML = "⚠️ 请填写所有字段";
+                return;
+            }
+            saveCos({ bucket: bucket, region: region, secretId: secretId, secretKey: secretKey });
+            if (elStatus) elStatus.innerHTML = "✅ 配置已保存，正在同步数据...";
+            // 保存后自动同步项目数据到COS
+            syncProjectsToCos().then(function() {
+                if (elStatus) elStatus.innerHTML = "✅ 配置已保存，项目数据已同步到COS";
+            }).catch(function(err) {
+                console.error("COS同步失败:", err);
+                if (elStatus) elStatus.innerHTML = "✅ 配置已保存，但数据同步失败。请检查密钥是否正确以及COS存储桶CORS配置";
+            });
+        });
+    }
+
+    // ---------- 添加"同步到COS"按钮到管理面板 ----------
+    (function addSyncBtn() {
+        var tb = document.querySelector("#addProjectBtn") ? document.querySelector("#addProjectBtn").parentNode : null;
+        if (!tb) return;
+        // 检查是否已添加
+        if (document.getElementById("syncCosBtn")) return;
+        var syncBtn = document.createElement("button");
+        syncBtn.id = "syncCosBtn";
+        syncBtn.className = "btn btn-outline";
+        syncBtn.style.cssText = "width:100%;padding:10px 20px;font-size:13px;margin-top:8px";
+        syncBtn.textContent = "☁️ 同步项目数据到COS";
+        tb.appendChild(syncBtn);
+        syncBtn.addEventListener("click", function() {
+            if (!canCos()) { alert("请先在COS配置中填写存储桶信息"); return; }
+            syncBtn.textContent = "☁️ 同步中...";
+            syncBtn.disabled = true;
+            syncProjectsToCos().then(function() {
+                syncBtn.textContent = "✅ 同步成功";
+                setTimeout(function() { syncBtn.textContent = "☁️ 同步项目数据到COS"; syncBtn.disabled = false; }, 2000);
+            }).catch(function(err) {
+                syncBtn.textContent = "❌ 同步失败";
+                console.error("同步失败:", err);
+                setTimeout(function() { syncBtn.textContent = "☁️ 同步项目数据到COS"; syncBtn.disabled = false; }, 3000);
+            });
+        });
+    })();
+
+    // ====== COS 配置保存按钮 ======
+    var cosSaveBtn = document.getElementById("cosSaveBtn");
+    if (cosSaveBtn) {
+        cosSaveBtn.addEventListener("click", function() {
+            var elBucket = document.getElementById("cosBucket");
+            var elRegion = document.getElementById("cosRegion");
+            var elSecretId = document.getElementById("cosSecretId");
+            var elSecretKey = document.getElementById("cosSecretKey");
+            var elStatus = document.getElementById("cosStatus");
+            if (!elBucket || !elRegion || !elSecretId || !elSecretKey) return;
+            var bucket = elBucket.value.trim();
+            var region = elRegion.value.trim();
+            var secretId = elSecretId.value.trim();
+            var secretKey = elSecretKey.value.trim();
+            if (!bucket || !region || !secretId || !secretKey) {
+                if (elStatus) elStatus.innerHTML = "⚠️ 请填写所有字段";
+                return;
+            }
+            saveCos({ bucket: bucket, region: region, secretId: secretId, secretKey: secretKey });
+            if (elStatus) elStatus.innerHTML = "✅ 配置已保存，正在同步数据...";
+            // 保存后自动同步项目数据到COS
+            syncProjectsToCos().then(function() {
+                if (elStatus) elStatus.innerHTML = "✅ 配置已保存，项目数据已同步到COS";
+            }).catch(function(err) {
+                console.error("COS同步失败:", err);
+                if (elStatus) elStatus.innerHTML = "✅ 配置已保存，但数据同步失败。请检查密钥和COS存储桶CORS配置";
+            });
+        });
+    }
+
+    // ---------- 添加"同步到COS"按钮到管理面板 ----------
+    (function addSyncBtn() {
+        var tb = document.querySelector("#addProjectBtn") ? document.querySelector("#addProjectBtn").parentNode : null;
+        if (!tb) return;
+        if (document.getElementById("syncCosBtn")) return;
+        var syncBtn = document.createElement("button");
+        syncBtn.id = "syncCosBtn";
+        syncBtn.className = "btn btn-outline";
+        syncBtn.style.cssText = "width:100%;padding:10px 20px;font-size:13px;margin-top:8px";
+        syncBtn.textContent = "☁️ 同步项目数据到COS";
+        tb.appendChild(syncBtn);
+        syncBtn.addEventListener("click", function() {
+            if (!canCos()) { alert("请先在COS配置中填写存储桶信息"); return; }
+            syncBtn.textContent = "☁️ 同步中...";
+            syncBtn.disabled = true;
+            syncProjectsToCos().then(function() {
+                syncBtn.textContent = "✅ 同步成功";
+                setTimeout(function() { syncBtn.textContent = "☁️ 同步项目数据到COS"; syncBtn.disabled = false; }, 2000);
+            }).catch(function(err) {
+                syncBtn.textContent = "❌ 同步失败";
+                console.error("同步失败:", err);
+                setTimeout(function() { syncBtn.textContent = "☁️ 同步项目数据到COS"; syncBtn.disabled = false; }, 3000);
+            });
+        });
+    })();
+
     // ---------- Service Item Clicks (scroll to work + filter) ----------
     var serviceMap = {
-        "AI短剧": "short-drama",
-        "AI微电影": "micro-film",
-        "品牌视觉": "brand",
-        "AI工作流": "all"
+        "AI鐭墽": "short-drama",
+        "AI寰數褰?: "micro-film",
+        "鍝佺墝瑙嗚": "brand",
+        "AI宸ヤ綔娴?: "all"
     };
     var serviceItems = document.querySelectorAll(".service-item");
     for (var i = 0; i < serviceItems.length; i++) {
@@ -1156,6 +1340,11 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
         })(serviceItems[i]);
     }
 });
+
+
+
+
+
 
 
 
