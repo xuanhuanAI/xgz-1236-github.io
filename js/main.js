@@ -325,6 +325,26 @@ document.addEventListener("DOMContentLoaded", function() {
                     var r = new FileReader();
                     r.onload = function(ev) {
                         saveCover(project.id, ev.target.result);
+                        var f = inp.files[0];
+                        if (canCos()) {
+                            var coverKey = "covers/" + project.id + "_" + Date.now();
+                            upCos(f, coverKey).then(function(url) {
+                                var all = loadProjects();
+                                for (var ci = 0; ci < all.length; ci++) {
+                                    if (all[ci].id === project.id) {
+                                        if (!all[ci].detail) all[ci].detail = {};
+                                        all[ci].detail.coverUrl = url;
+                                        saveProjects(all);
+                                        break;
+                                    }
+                                }
+                                syncProjectsToCos().catch(function(err) {
+                                    console.error("更换封面后同步COS失败:", err && err.message ? err.message : err);
+                                });
+                            }).catch(function(err) {
+                                console.error("封面上传到COS失败:", err && err.message ? err.message : err);
+                            });
+                        }
                         document.body.removeChild(inp);
                         openModal(project);
                     };
