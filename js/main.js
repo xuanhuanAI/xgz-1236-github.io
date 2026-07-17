@@ -325,6 +325,7 @@ document.addEventListener("DOMContentLoaded", function() {
                     var r = new FileReader();
                     r.onload = function(ev) {
                         saveCover(project.id, ev.target.result);
+                        console.log("[封面DEBUG] saveCover done for project.id=" + project.id);
                         var f = inp.files[0];
                         if (canCos()) {
                             var coverKey = "covers/" + project.id + "_" + Date.now();
@@ -335,6 +336,21 @@ document.addEventListener("DOMContentLoaded", function() {
                                         if (!all[ci].detail) all[ci].detail = {};
                                         all[ci].detail.coverUrl = url;
                                         saveProjects(all);
+                                        console.log("[封面DEBUG] saveProjects done, verifying...");
+                                        var v = loadProjects();
+                                        var found = false;
+                                        for (var vi = 0; vi < v.length; vi++) {
+                                            if (v[vi].id === project.id) {
+                                                found = true;
+                                                if (v[vi].detail && v[vi].detail.coverUrl) {
+                                                    console.log("[封面DEBUG] VERIFY OK: coverUrl=" + v[vi].detail.coverUrl);
+                                                } else {
+                                                    console.error("[封面DEBUG] VERIFY FAILED: coverUrl is missing after save!");
+                                                }
+                                                break;
+                                            }
+                                        }
+                                        if (!found) console.error("[封面DEBUG] VERIFY FAILED: project.id=" + project.id + " not found in localStorage after save!");
                                         break;
                                     }
                                 }
