@@ -45,7 +45,7 @@ document.addEventListener("DOMContentLoaded", function() {
     }
     function saveProjects(data) { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch(e) {} }
 
-    // ====== COS Upload using Web Crypto API ======
+    // ====== COS Upload using Official Tencent SDK ======
     var COS_KEY = "cos_config_site";
     function loadCos() {
         try { var s = localStorage.getItem(COS_KEY); return s ? JSON.parse(s) : null; } catch(e) { return null; }
@@ -61,109 +61,72 @@ document.addEventListener("DOMContentLoaded", function() {
         var c = loadCos();
         return c ? "https://" + c.bucket + ".cos." + c.region + ".myqcloud.com" : null;
     }
-    function encPath(p) {
-        return p.split("/").map(function(s) { return encodeURIComponent(s); }).join("/");
-    }
-    
-    // Web Crypto API helpers
-    function bufToHex(buf) {
-        return Array.from(new Uint8Array(buf)).map(function(b) {
-            return (b >> 4).toString(16) + (b & 15).toString(16);
-        }).join("");
-    }
-    function hexToBytes(hex) {
-        var b = new Uint8Array(hex.length / 2);
-        for (var i = 0; i < hex.length; i += 2) b[i/2] = parseInt(hex.substr(i, 2), 16);
-        return b;
-    }
-    
-    // Build COS auth using Web Crypto API (browser built-in, reliable)
-    async function buildCosAuth(method, path, cfg, keyTime, contentType) {
-        // Debug: log key info
-        console.log("COS Debug - method:", method, "path:", path);
-        console.log("COS Debug - keyTime:", keyTime);
-        console.log("COS Debug - SecretId:", cfg.secretId);
-        if (cfg.secretKey) {
-            console.log("COS Debug - SecretKey length:", cfg.secretKey.length);
-            console.log("COS Debug - SecretKey first/last:", cfg.secretKey.substring(0,3) + "..." + cfg.secretKey.substring(cfg.secretKey.length-3));
+    function initCos() {
+        var c = loadCos();
+        if (!c || !c.secretId || !c.secretKey || !c.bucket || !c.region) return null;
+        if (typeof COS === "undefined") {
+            console.error("COS SDK not loaded. Check CDN script.");
+            return null;
         }
-        var host = cfg.bucket + ".cos." + cfg.region + ".myqcloud.com";
-        var ct = contentType || "application/octet-stream";
-        var enc = new TextEncoder();
-        var headers = "content-type=" + encodeURIComponent(ct) + "&host=" + host;
-        var hs = method.toLowerCase() + "\n" + path + "\n\n" + headers + "\n";
-        var sha1Bytes = await crypto.subtle.digest("SHA-1", enc.encode(hs));
-        var hs1 = bufToHex(sha1Bytes);
-        var sts = "sha1\n" + keyTime + "\n" + hs1 + "\n";
-        var key1 = await crypto.subtle.importKey("raw", enc.encode(cfg.secretKey),
-            { name: "HMAC", hash: "SHA-1" }, false, ["sign"]);
-        var skBuf = await crypto.subtle.sign("HMAC", key1, enc.encode(keyTime));
-        var sk = bufToHex(skBuf);
-        var key2 = await crypto.subtle.importKey("raw", enc.encode(sk),
-            { name: "HMAC", hash: "SHA-1" }, false, ["sign"]);
-        var sigBuf = await crypto.subtle.sign("HMAC", key2, enc.encode(sts));
-        var sig = bufToHex(sigBuf);
-        return "q-sign-algorithm=sha1&q-ak=" + cfg.secretId +
-            "&q-sign-time=" + keyTime + "&q-key-time=" + keyTime +
-            "&q-header-list=content-type;host&q-url-param-list=&q-signature=" + sig;
+        return new COS({
+            SecretId: c.secretId,
+            SecretKey: c.secretKey
+        });
     }
-    
+
     function upCos(file, key) {
-        var cfg = loadCos();
-        if (!cfg) return Promise.reject(new Error("COS未配置"));
-        var host = cfg.bucket + ".cos." + cfg.region + ".myqcloud.com";
-        var cPath = "/" + encPath(key);
-        var url = "https://" + host + cPath;
-        var now = Math.floor(Date.now() / 1000);
-        var kt = now + ";" + (now + 86400);
-        var ct = file.type || "application/octet-stream";
-        var m = "put";
-        return buildCosAuth(m, cPath, cfg, kt, ct).then(function(auth) {
-            return new Promise(function(resolve, reject) {
-                var xhr = new XMLHttpRequest();
-                xhr.open("PUT", url, true);
-                xhr.setRequestHeader("Authorization", auth);
-                xhr.setRequestHeader("Content-Type", ct);
-                xhr.onload = function() {
-                    if (xhr.status >= 200 && xhr.status < 300) {
-                        resolve(url + "?t=" + now);
-                    } else {
-                        var errText = xhr.responseText || "unknown error";
-                        try {
-                            var p = new DOMParser();
-                            var xd = p.parseFromString(errText, "text/xml");
-                            var code = xd.getElementsByTagName("Code")[0];
-                            var msg = xd.getElementsByTagName("Message")[0];
-                            console.error("COS错误:", code ? code.textContent : "?", msg ? msg.textContent : "?");
-                        } catch(e) {}
-                        reject(new Error("HTTP " + xhr.status + ": " + errText.slice(0, 200)));
-                    }
-                };
-                xhr.onerror = function() { reject(new Error("网络错误")); };
-                xhr.send(file);
+        var cos = initCos();
+        if (!cos) return Promise.reject(new Error("COS未配置或SDK未加载"));
+        var c = loadCos();
+        return new Promise(function(resolve, reject) {
+            cos.putObject({
+                Bucket: c.bucket,
+                Region: c.region,
+                Key: key,
+                Body: file,
+                onProgress: function() {}
+            }, function(err, data) {
+                if (err) {
+                    console.error("COS SDK错误:", err);
+                    reject(new Error(err.message || "COS上传失败"));
+                } else {
+                    var url = "https://" + c.bucket + ".cos." + c.region + ".myqcloud.com/" + key;
+                    resolve(url + "?t=" + Math.floor(Date.now() / 1000));
+                }
             });
         });
     }
-    
+
     // ====== COS Data Sync ======
     function getCosJson(path) {
-        var cfg = loadCos();
-        if (!cfg) return Promise.reject(new Error("COS未配置"));
-        var url = "https://" + cfg.bucket + ".cos." + cfg.region + ".myqcloud.com/" + path;
+        var cos = initCos();
+        if (!cos) return Promise.reject(new Error("COS未配置或SDK未加载"));
+        var c = loadCos();
         return new Promise(function(resolve, reject) {
-            var xhr = new XMLHttpRequest();
-            xhr.open("GET", url, true);
-            xhr.onload = function() {
-                if (xhr.status === 200) {
-                    try { resolve(JSON.parse(xhr.responseText)); } catch(e) { reject(new Error("JSON解析失败")); }
-                } else if (xhr.status === 404) {
-                    resolve(null);
+            cos.getObject({
+                Bucket: c.bucket,
+                Region: c.region,
+                Key: path
+            }, function(err, data) {
+                if (err) {
+                    if (err.statusCode === 404) {
+                        resolve(null);
+                    } else {
+                        reject(err);
+                    }
                 } else {
-                    reject(new Error("HTTP " + xhr.status));
+                    try {
+                        var body = data.Body;
+                        if (body instanceof Blob) {
+                            var r = new FileReader();
+                            r.onload = function() { resolve(JSON.parse(r.result)); };
+                            r.readAsText(body);
+                        } else {
+                            resolve(JSON.parse(body));
+                        }
+                    } catch(e) { reject(new Error("JSON解析失败")); }
                 }
-            };
-            xhr.onerror = function() { reject(new Error("网络错误")); };
-            xhr.send();
+            });
         });
     }
 
@@ -670,63 +633,36 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
         cosTestBtn.addEventListener("click", function() {
             var elStatus = document.getElementById("cosStatus");
             if (!elStatus) return;
-            var cfg = {
-                bucket: (document.getElementById("cosBucket") || {}).value || "",
-                region: (document.getElementById("cosRegion") || {}).value || "",
-                secretId: (document.getElementById("cosSecretId") || {}).value || "",
-                secretKey: (document.getElementById("cosSecretKey") || {}).value || ""
-            };
-            if (!cfg.bucket || !cfg.region || !cfg.secretId || !cfg.secretKey) {
+            var bucket = (document.getElementById("cosBucket") || {}).value || "";
+            var region = (document.getElementById("cosRegion") || {}).value || "";
+            var secretId = (document.getElementById("cosSecretId") || {}).value || "";
+            var secretKey = (document.getElementById("cosSecretKey") || {}).value || "";
+            if (!bucket || !region || !secretId || !secretKey) {
                 elStatus.innerHTML = "请先填写所有COS配置字段";
+                elStatus.style.color = "";
+                return;
+            }
+            if (typeof COS === "undefined") {
+                elStatus.innerHTML = "COS SDK未加载，检查网络";
+                elStatus.style.color = "#ff6b6b";
                 return;
             }
             elStatus.innerHTML = "正在测试连接...";
+            elStatus.style.color = "";
             cosTestBtn.disabled = true;
-            var host = cfg.bucket + ".cos." + cfg.region + ".myqcloud.com";
-            var url = "https://" + host + "/";
-            var now = Math.floor(Date.now() / 1000);
-            var kt = now + ";" + (now + 86400);
-            buildCosAuth("get", "/", cfg, kt, "").then(function(auth) {
-                var xhr = new XMLHttpRequest();
-                xhr.open("GET", url, true);
-                xhr.setRequestHeader("Authorization", auth);
-                xhr.onload = function() {
-                    cosTestBtn.disabled = false;
-                    if (xhr.status >= 200 && xhr.status < 300) {
-                        elStatus.innerHTML = '连接成功! 存储桶可访问';
-                        elStatus.style.color = "#4caf50";
-                    } else if (xhr.status === 403) {
-                        try {
-                            var p = new DOMParser();
-                            var xd = p.parseFromString(xhr.responseText, "text/xml");
-                            var code = xd.getElementsByTagName("Code")[0];
-                            var msg = xd.getElementsByTagName("Message")[0];
-                            var c = code ? code.textContent : "?";
-                            var m = msg ? msg.textContent : "?";
-                            elStatus.innerHTML = "认证失败 " + c + ": " + m;
-                            elStatus.style.color = "#ff6b6b";
-                            console.error("COS测试失败 - Code:", c, "Message:", m);
-                            console.error("请检查SecretId和SecretKey是否匹配，或前往 https://console.cloud.tencent.com/cam/capi 重新创建密钥");
-                        } catch(e2) {
-                            elStatus.innerHTML = "认证失败 HTTP " + xhr.status;
-                            elStatus.style.color = "#ff6b6b";
-                        }
-                    } else {
-                        elStatus.innerHTML = "连接失败 HTTP " + xhr.status;
-                        elStatus.style.color = "#ff6b6b";
-                    }
-                };
-                xhr.onerror = function() {
-                    cosTestBtn.disabled = false;
-                    elStatus.innerHTML = "网络错误 无法连接到COS";
-                    elStatus.style.color = "#ff6b6b";
-                };
-                xhr.send();
-            }).catch(function(err) {
+            var testCos = new COS({ SecretId: secretId, SecretKey: secretKey });
+            testCos.getService({}, function(err, data) {
                 cosTestBtn.disabled = false;
-                elStatus.innerHTML = "签名生成失败";
-                elStatus.style.color = "#ff6b6b";
-                console.error("COS测试 - buildCosAuth 失败:", err);
+                if (err) {
+                    var code = err.code || err.Error && err.Error.Code || "未知";
+                    var msg = err.message || err.Error && err.Error.Message || "";
+                    elStatus.innerHTML = "连接失败: " + code + " - " + msg;
+                    elStatus.style.color = "#ff6b6b";
+                    console.error("COS SDK测试失败:", err);
+                } else {
+                    elStatus.innerHTML = "连接成功! SDK可正常工作";
+                    elStatus.style.color = "#4caf50";
+                }
             });
         });
     }
