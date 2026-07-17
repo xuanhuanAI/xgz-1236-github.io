@@ -79,6 +79,14 @@ document.addEventListener("DOMContentLoaded", function() {
     
     // Build COS auth using Web Crypto API (browser built-in, reliable)
     async function buildCosAuth(method, path, cfg, keyTime, contentType) {
+        // Debug: log key info
+        console.log("COS Debug - method:", method, "path:", path);
+        console.log("COS Debug - keyTime:", keyTime);
+        console.log("COS Debug - SecretId:", cfg.secretId);
+        if (cfg.secretKey) {
+            console.log("COS Debug - SecretKey length:", cfg.secretKey.length);
+            console.log("COS Debug - SecretKey first/last:", cfg.secretKey.substring(0,3) + "..." + cfg.secretKey.substring(cfg.secretKey.length-3));
+        }
         var host = cfg.bucket + ".cos." + cfg.region + ".myqcloud.com";
         var ct = contentType || "application/octet-stream";
         var enc = new TextEncoder();
@@ -603,6 +611,33 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
     initScrollReveal();
     // 从COS加载项目数据
     setTimeout(function() { loadProjectsFromCos(); }, 500);
+    // ====== COS 配置面板展开/收起 ======
+    var cosToggleBtn = document.getElementById("cosToggleBtn");
+    if (cosToggleBtn) {
+        cosToggleBtn.addEventListener("click", function() {
+            var panel = document.getElementById("cosConfigPanel");
+            if (!panel) return;
+            var isOpen = panel.style.display !== "none";
+            panel.style.display = isOpen ? "none" : "block";
+            if (!isOpen) {
+                var c = loadCos() || {};
+                var elBucket = document.getElementById("cosBucket");
+                var elRegion = document.getElementById("cosRegion");
+                var elSecretId = document.getElementById("cosSecretId");
+                var elSecretKey = document.getElementById("cosSecretKey");
+                var elStatus = document.getElementById("cosStatus");
+                if (elBucket) elBucket.value = c.bucket || "qaz123456-1454067625";
+                if (elRegion) elRegion.value = c.region || "";
+                if (elSecretId) elSecretId.value = c.secretId || "";
+                if (elSecretKey) elSecretKey.value = c.secretKey || "";
+                if (elStatus) {
+                    if (c.secretId) elStatus.textContent = "已配置";
+                    else elStatus.textContent = "";
+                }
+            }
+        });
+    }
+
     // ====== COS 配置保存按钮 ======
     var cosSaveBtn = document.getElementById("cosSaveBtn");
     if (cosSaveBtn) {
@@ -629,9 +664,76 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
         });
     }
 
+    // ====== COS 连接测试 ======
+    var cosTestBtn = document.getElementById("cosTestBtn");
+    if (cosTestBtn) {
+        cosTestBtn.addEventListener("click", function() {
+            var elStatus = document.getElementById("cosStatus");
+            if (!elStatus) return;
+            var cfg = {
+                bucket: (document.getElementById("cosBucket") || {}).value || "",
+                region: (document.getElementById("cosRegion") || {}).value || "",
+                secretId: (document.getElementById("cosSecretId") || {}).value || "",
+                secretKey: (document.getElementById("cosSecretKey") || {}).value || ""
+            };
+            if (!cfg.bucket || !cfg.region || !cfg.secretId || !cfg.secretKey) {
+                elStatus.innerHTML = "请先填写所有COS配置字段";
+                return;
+            }
+            elStatus.innerHTML = "正在测试连接...";
+            cosTestBtn.disabled = true;
+            var host = cfg.bucket + ".cos." + cfg.region + ".myqcloud.com";
+            var url = "https://" + host + "/";
+            var now = Math.floor(Date.now() / 1000);
+            var kt = now + ";" + (now + 86400);
+            buildCosAuth("get", "/", cfg, kt, "").then(function(auth) {
+                var xhr = new XMLHttpRequest();
+                xhr.open("GET", url, true);
+                xhr.setRequestHeader("Authorization", auth);
+                xhr.onload = function() {
+                    cosTestBtn.disabled = false;
+                    if (xhr.status >= 200 && xhr.status < 300) {
+                        elStatus.innerHTML = '连接成功! 存储桶可访问';
+                        elStatus.style.color = "#4caf50";
+                    } else if (xhr.status === 403) {
+                        try {
+                            var p = new DOMParser();
+                            var xd = p.parseFromString(xhr.responseText, "text/xml");
+                            var code = xd.getElementsByTagName("Code")[0];
+                            var msg = xd.getElementsByTagName("Message")[0];
+                            var c = code ? code.textContent : "?";
+                            var m = msg ? msg.textContent : "?";
+                            elStatus.innerHTML = "认证失败 " + c + ": " + m;
+                            elStatus.style.color = "#ff6b6b";
+                            console.error("COS测试失败 - Code:", c, "Message:", m);
+                            console.error("请检查SecretId和SecretKey是否匹配，或前往 https://console.cloud.tencent.com/cam/capi 重新创建密钥");
+                        } catch(e2) {
+                            elStatus.innerHTML = "认证失败 HTTP " + xhr.status;
+                            elStatus.style.color = "#ff6b6b";
+                        }
+                    } else {
+                        elStatus.innerHTML = "连接失败 HTTP " + xhr.status;
+                        elStatus.style.color = "#ff6b6b";
+                    }
+                };
+                xhr.onerror = function() {
+                    cosTestBtn.disabled = false;
+                    elStatus.innerHTML = "网络错误 无法连接到COS";
+                    elStatus.style.color = "#ff6b6b";
+                };
+                xhr.send();
+            }).catch(function(err) {
+                cosTestBtn.disabled = false;
+                elStatus.innerHTML = "签名生成失败";
+                elStatus.style.color = "#ff6b6b";
+                console.error("COS测试 - buildCosAuth 失败:", err);
+            });
+        });
+    }
+
     // ---------- 添加同步按钮到管理面板 ----------
+    var tb = document.querySelector("#addProjectBtn") ? document.querySelector("#addProjectBtn").parentNode : null;
     (function() {
-        var tb = document.querySelector("#addProjectBtn") ? document.querySelector("#addProjectBtn").parentNode : null;
         if (!tb || document.getElementById("syncCosBtn")) return;
         var btn = document.createElement("button");
         btn.id = "syncCosBtn";
