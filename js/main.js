@@ -43,7 +43,7 @@ document.addEventListener("DOMContentLoaded", function() {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(seed));
         return seed;
     }
-    function saveProjects(data) { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
+    function saveProjects(data) { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch(e) {}
 
     // ====== COS Upload using Web Crypto API ======
     var COS_KEY = "cos_config_site";
