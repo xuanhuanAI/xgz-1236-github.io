@@ -68,9 +68,6 @@ document.addEventListener("DOMContentLoaded", function() {
         var c = loadCos();
         if (!c || !c.secretId || !c.secretKey || !c.bucket || !c.region) return null;
         if (typeof COS === "undefined") {
-                if (timedOut) return;
-                clearTimeout(timer);
-
             console.error("COS SDK not loaded. Check CDN script.");
             return null;
         }
@@ -366,9 +363,11 @@ document.addEventListener("DOMContentLoaded", function() {
                                         break;
                                     }
                                 }
-                                syncProjectsToCos().catch(function(err) {
-                                    console.error("更换封面后同步COS失败:", err && err.message ? err.message : err);
+                                                                // 强制同步（封面URL可能未更新，但其他数据要同步）
+                                syncProjectsToCos().catch(function(e2) {
+                                    console.error("最终同步失败:", e2);
                                 });
+                            });
                             }).catch(function(err) {
                                 console.error("封面上传到COS失败:", err && err.message ? err.message : err);
                             });
@@ -592,7 +591,7 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
                     if (!all[i].detail) all[i].detail = {};
                     all[i].detail.subtitle = subtitle;
                     all[i].detail.highlights = hlList;
-                    all[i].detail.coverUrl = coverUrlText || "";
+                    all[i].detail.coverUrl = coverUrlText || all[i].detail.coverUrl || "";
                     break;
                 }
             }
@@ -612,6 +611,7 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
         saveProjects(all);
 
         var cosTasks = [];
+        var uploadErrors = [];
 
         if (formCoverFile.files[0]) {
             // If URL text is filled, only save locally, dont upload to COS
@@ -621,19 +621,28 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
             r.readAsDataURL(f);
             if (canCos() && !coverUrlText) {
                 var coverKey = "covers/" + id + "_" + Date.now();
-                cosTasks.push(
-                    upCos(f, coverKey).then(function(url) {
-                        var all2 = loadProjects();
-                        for (var ci = 0; ci < all2.length; ci++) {
-                            if (all2[ci].id === id) {
-                                if (!all2[ci].detail) all2[ci].detail = {};
-                                all2[ci].detail.coverUrl = url;
-                                saveProjects(all2);
-                                break;
+                try {
+                    cosTasks.push(
+                        upCos(f, coverKey).then(function(url) {
+                            var all2 = loadProjects();
+                            for (var ci = 0; ci < all2.length; ci++) {
+                                if (all2[ci].id === id) {
+                                    if (!all2[ci].detail) all2[ci].detail = {};
+                                    all2[ci].detail.coverUrl = url;
+                                    saveProjects(all2);
+                                    console.log("[封面] COS上传成功:", url.slice(0,60));
+                                    break;
+                                }
                             }
-                        }
-                    })
-                );
+                        }).catch(function(err) {
+                            uploadErrors.push("封面: " + (err.message || err));
+                            console.error("[封面] COS上传失败:", err);
+                        })
+                    );
+                } catch(e) {
+                    uploadErrors.push("封面上传异常: " + (e.message || e));
+                    console.error("[封面] 上传异常:", e);
+                }
             }
         }
         if (formVideoFile.files[0]) {
@@ -673,12 +682,18 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
                 }));
             settleAll.then(function(results) {
                 var failed = results.filter(function(r) { return r.status === "rejected"; });
-                if (failed.length > 0) console.warn(failed.length + " COS upload(s) failed, data still synced");
+                if (failed.length > 0 || uploadErrors.length > 0) {
+                    console.warn((failed.length + uploadErrors.length) + " upload(s) had issues, data still synced");
+                }
+                doSync();
+            }).catch(function(e) {
+                console.error("settleAll failed, forcing sync:", e);
                 doSync();
             });
         } else {
             doSync();
         }
+        // 即使上传失败，项目数据也会同步到COS（除封面图片本身外）
         formModal.classList.remove("open");
         renderAdminList();
         var active = document.querySelector(".filter-btn.active");
