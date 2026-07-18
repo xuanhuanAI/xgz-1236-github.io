@@ -367,7 +367,6 @@ document.addEventListener("DOMContentLoaded", function() {
                                 syncProjectsToCos().catch(function(e2) {
                                     console.error("最终同步失败:", e2);
                                 });
-                            });
                             }).catch(function(err) {
                                 console.error("封面上传到COS失败:", err && err.message ? err.message : err);
                             });
