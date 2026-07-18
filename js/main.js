@@ -203,10 +203,28 @@ document.addEventListener("DOMContentLoaded", function() {
     function getCover(id) { try { return (JSON.parse(localStorage.getItem(COVERS_KEY))||{})[id]; } catch(e) { return null; } }
     function saveCover(id, dataUrl) {
         try {
-            var c = JSON.parse(localStorage.getItem(COVERS_KEY)) || {};
-            c[id] = dataUrl;
-            localStorage.setItem(COVERS_KEY, JSON.stringify(c));
-        } catch(e) { alert("封面图片太大，建议压缩后上传"); }
+            // 压缩大图再保存到localStorage
+            var img = new Image();
+            img.onload = function() {
+                try {
+                    var maxW = 800, maxH = 600;
+                    var w = img.width, h = img.height;
+                    if (w > maxW || h > maxH) {
+                        var ratio = Math.min(maxW / w, maxH / h, 1);
+                        w = Math.round(w * ratio); h = Math.round(h * ratio);
+                    }
+                    var cvs = document.createElement("canvas");
+                    cvs.width = w; cvs.height = h;
+                    var ctx = cvs.getContext("2d");
+                    ctx.drawImage(img, 0, 0, w, h);
+                    var compressed = cvs.toDataURL("image/jpeg", 0.85);
+                    var c = JSON.parse(localStorage.getItem(COVERS_KEY)) || {};
+                    c[id] = compressed;
+                    localStorage.setItem(COVERS_KEY, JSON.stringify(c));
+                } catch(ce) {}
+            };
+            img.src = dataUrl;
+        } catch(e) {}
     }
     function deleteCover(id) {
         try { var c = JSON.parse(localStorage.getItem(COVERS_KEY))||{}; delete c[id]; localStorage.setItem(COVERS_KEY,JSON.stringify(c)); } catch(e) {}
