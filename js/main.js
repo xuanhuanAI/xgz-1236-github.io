@@ -25,6 +25,7 @@ document.addEventListener("DOMContentLoaded", function() {
     var formCoverFile = document.getElementById("formCoverFile");
     var formVideoFile = document.getElementById("formVideoFile");
     var formCoverPreview = document.getElementById("formCoverPreview");
+    var formCoverUrlInput = document.getElementById("formCoverUrl");
     var currentUploadProjectId = null;
 
     var typeLabels = {
@@ -362,7 +363,13 @@ document.addEventListener("DOMContentLoaded", function() {
                             });
                         }
                         document.body.removeChild(inp);
-                        openModal(project);
+                        // Reload fresh data before showing modal
+                        var fresh = loadProjects();
+                        var found = null;
+                        for (var fi = 0; fi < fresh.length; fi++) {
+                            if (fresh[fi].id === project.id) { found = fresh[fi]; break; }
+                        }
+                        openModal(found || project);
                     };
                     r.readAsDataURL(inp.files[0]);
                 });
@@ -540,6 +547,9 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
         formCoverPreview.innerHTML = "";
         formCoverFile.value = "";
         formVideoFile.value = "";
+        if (formCoverUrlInput) {
+            formCoverUrlInput.value = (project && project.detail && project.detail.coverUrl) || "";
+        }
     }
 
         formCancel.addEventListener("click", function() { formModal.classList.remove("open"); });
@@ -556,6 +566,7 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
         var subtitle = document.getElementById("formSubtitle").value.trim();
         var hlRaw = document.getElementById("formHighlights").value.trim();
         var hlList = hlRaw ? hlRaw.split("\n").map(function(s) { return s.trim(); }).filter(function(s) { return s; }) : [];
+        var coverUrlText = document.getElementById("formCoverUrl").value.trim();
 
         var all = loadProjects();
 
@@ -570,6 +581,7 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
                     if (!all[i].detail) all[i].detail = {};
                     all[i].detail.subtitle = subtitle;
                     all[i].detail.highlights = hlList;
+                    all[i].detail.coverUrl = coverUrlText || "";
                     break;
                 }
             }
@@ -580,7 +592,7 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
                 typeLabel: typeLabels[type] || type,
                 highlight: highlight || "",
                 colors: ["#1a1a2e","#16213e","#0f3460"],
-                detail: { subtitle: subtitle || "", highlights: hlList, video: "" }
+                detail: { subtitle: subtitle || "", highlights: hlList, video: "", coverUrl: coverUrlText || "" }
             };
             all.push(np);
             id = newId;
@@ -591,11 +603,12 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
         var cosTasks = [];
 
         if (formCoverFile.files[0]) {
+            // If URL text is filled, only save locally, dont upload to COS
             var f = formCoverFile.files[0];
             var r = new FileReader();
             r.onload = function(ev) { saveCover(id, ev.target.result); };
             r.readAsDataURL(f);
-            if (canCos()) {
+            if (canCos() && !coverUrlText) {
                 var coverKey = "covers/" + id + "_" + Date.now();
                 cosTasks.push(
                     upCos(f, coverKey).then(function(url) {
