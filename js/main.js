@@ -157,6 +157,20 @@ document.addEventListener("DOMContentLoaded", function() {
     function loadProjectsFromCos() {
         getCosJson("site/projects.json").then(function(data) {
             if (data && Array.isArray(data) && data.length > 0) {
+                // 合并数据：保留本地的coverUrl，不被COS旧数据冲掉
+                var local = loadProjects();
+                for (var mi = 0; mi < data.length; mi++) {
+                    for (var li = 0; li < local.length; li++) {
+                        if (data[mi].id === local[li].id) {
+                            var localCover = local[li].detail && local[li].detail.coverUrl;
+                            if (localCover) {
+                                if (!data[mi].detail) data[mi].detail = {};
+                                data[mi].detail.coverUrl = localCover;
+                            }
+                            break;
+                        }
+                    }
+                }
                 saveProjects(data);
                 var active = document.querySelector(".filter-btn.active");
                 renderProjects(active ? active.getAttribute("data-filter") : "all");
