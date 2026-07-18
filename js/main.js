@@ -620,6 +620,20 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
             r.readAsDataURL(f);
             if (canCos() && !coverUrlText) {
                 var coverKey = "covers/" + id + "_" + Date.now();
+                // 先计算预期URL并写入项目数据，确保同步时一定有值
+                var baseUrl = getCosBaseUrl();
+                var expectedUrl = baseUrl + "/" + coverKey + "?t=" + Math.floor(Date.now() / 1000);
+                var allNow = loadProjects();
+                for (var ni = 0; ni < allNow.length; ni++) {
+                    if (allNow[ni].id === id) {
+                        if (!allNow[ni].detail) allNow[ni].detail = {};
+                        allNow[ni].detail.coverUrl = expectedUrl;
+                        saveProjects(allNow);
+                        console.log("[封面] 预写入coverUrl:", expectedUrl.slice(0,60));
+                        break;
+                    }
+                }
+                // 上传到COS并更新URL（带时间戳的新URL）
                 try {
                     cosTasks.push(
                         upCos(f, coverKey).then(function(url) {
@@ -629,13 +643,14 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
                                     if (!all2[ci].detail) all2[ci].detail = {};
                                     all2[ci].detail.coverUrl = url;
                                     saveProjects(all2);
-                                    console.log("[封面] COS上传成功:", url.slice(0,60));
+                                    console.log("[封面] COS上传成功,已更新coverUrl:", url.slice(0,60));
                                     break;
                                 }
                             }
                         }).catch(function(err) {
+                            // 上传失败但coverUrl已有值（预期URL），依然可用
                             uploadErrors.push("封面: " + (err.message || err));
-                            console.error("[封面] COS上传失败:", err);
+                            console.error("[封面] COS上传失败,已保留预写入URL:", err);
                         })
                     );
                 } catch(e) {
