@@ -145,6 +145,16 @@ document.addEventListener("DOMContentLoaded", function() {
         var cfg = loadCos();
         if (!cfg) return Promise.reject(new Error("COS未配置"));
         var data = loadProjects();
+        // 合并lulu_covers到detail.coverUrl，确保封面URL一定被同步
+        try {
+            var covers = JSON.parse(localStorage.getItem(COVERS_KEY) || "{}");
+            for (var si = 0; si < data.length; si++) {
+                if (!data[si].detail) data[si].detail = {};
+                if (!data[si].detail.coverUrl && covers[data[si].id]) {
+                    data[si].detail.coverUrl = covers[data[si].id];
+                }
+            }
+        } catch(se) {}
         var jsonStr = JSON.stringify(data, null, 2);
         var blob = new Blob([jsonStr], { type: "application/json" });
         var key = "site/projects.json";
@@ -159,16 +169,24 @@ document.addEventListener("DOMContentLoaded", function() {
             if (data && Array.isArray(data) && data.length > 0) {
                 // 合并数据：保留本地的coverUrl，不被COS旧数据冲掉
                 var local = loadProjects();
+                try {
+                    var covers = JSON.parse(localStorage.getItem(COVERS_KEY) || "{}");
+                } catch(ce) { var covers = {}; }
                 for (var mi = 0; mi < data.length; mi++) {
+                    if (!data[mi].detail) data[mi].detail = {};
+                    // 从本地项目数据合并
                     for (var li = 0; li < local.length; li++) {
                         if (data[mi].id === local[li].id) {
                             var localCover = local[li].detail && local[li].detail.coverUrl;
                             if (localCover) {
-                                if (!data[mi].detail) data[mi].detail = {};
                                 data[mi].detail.coverUrl = localCover;
                             }
                             break;
                         }
+                    }
+                    // 从lulu_covers合并（兜底）
+                    if (!data[mi].detail.coverUrl && covers[data[mi].id]) {
+                        data[mi].detail.coverUrl = covers[data[mi].id];
                     }
                 }
                 saveProjects(data);
