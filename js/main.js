@@ -68,6 +68,9 @@ document.addEventListener("DOMContentLoaded", function() {
         var c = loadCos();
         if (!c || !c.secretId || !c.secretKey || !c.bucket || !c.region) return null;
         if (typeof COS === "undefined") {
+                if (timedOut) return;
+                clearTimeout(timer);
+
             console.error("COS SDK not loaded. Check CDN script.");
             return null;
         }
@@ -77,11 +80,17 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     }
 
-    function upCos(file, key) {
+    function upCos(file, key, timeout) {
+        timeout = timeout || 30000;
         var cos = initCos();
         if (!cos) return Promise.reject(new Error("COS未配置或SDK未加载"));
         var c = loadCos();
         return new Promise(function(resolve, reject) {
+            var timedOut = false;
+            var timer = setTimeout(function() {
+                timedOut = true;
+                reject(new Error("COS上传超时(" + (timeout/1000) + "秒)"));
+            }, timeout);
             cos.putObject({
                 Bucket: c.bucket,
                 Region: c.region,
@@ -90,6 +99,8 @@ document.addEventListener("DOMContentLoaded", function() {
                 ACL: "public-read",
                 onProgress: function() {}
             }, function(err, data) {
+                if (timedOut) return;
+                clearTimeout(timer);
                 if (err) {
                     console.error("COS SDK错误:", err);
                     reject(new Error(err.message || "COS上传失败"));
@@ -654,7 +665,17 @@ function closeModal() { modal.classList.remove("open"); document.body.style.over
             }
         };
         if (cosTasks.length > 0) {
-            Promise.all(cosTasks).then(doSync);
+            // allSettled: ensure sync runs even if upload fails
+            var settleAll = typeof Promise.allSettled === "function"
+                ? Promise.allSettled(cosTasks)
+                : Promise.all(cosTasks.map(function(p) {
+                    return p.then(function(v) { return {status:"fulfilled",value:v}; }, function(e) { return {status:"rejected",reason:e}; });
+                }));
+            settleAll.then(function(results) {
+                var failed = results.filter(function(r) { return r.status === "rejected"; });
+                if (failed.length > 0) console.warn(failed.length + " COS upload(s) failed, data still synced");
+                doSync();
+            });
         } else {
             doSync();
         }
